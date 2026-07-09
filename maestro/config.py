@@ -46,9 +46,10 @@ class Settings(BaseSettings):
     max_subtasks: int = 6  # a good decomposition is tight, not sprawling (§10)
 
     # --- Loop / cost ceilings (§15) ---
-    max_steps: int = 40
+    max_steps: int = 40  # global backstop: total node executions per run
     max_critic_iters: int = 3
     max_recovery_attempts: int = 2
+    loop_detect_threshold: int = 5  # same delegation dispatched this many times -> loop
 
     # --- Backoff / rate-limit resilience (tenacity; §15) ---
     backoff_base_seconds: float = 1.0
@@ -59,6 +60,11 @@ class Settings(BaseSettings):
     # --- Fault injection (makes visible recovery demoable; §13) ---
     fault_injection: bool = False
     fault_injection_tool: str = "web_search"
+
+    # --- Demo: force the Critic to REJECT its first N reviews (§12, §21.3) ---
+    # A genuine LLM critic can reject on its own; this makes a rejection reliably
+    # triggerable on demand for the reject->revise->pass demo. 0 = off.
+    force_critic_reject: int = 0
 
     # --- Storage ---
     trace_db_path: str = "maestro_runs.db"

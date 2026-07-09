@@ -48,6 +48,38 @@ _RATE_LIMIT_MARKERS = (
     "too many requests",
 )
 
+# Phrases / class-name fragments for transient server errors worth retrying.
+_TRANSIENT_MARKERS = (
+    "unavailable",
+    "overloaded",
+    "try again",
+    "internal error",
+    "internal server error",
+    "deadline exceeded",
+    "temporarily",
+)
+_TRANSIENT_CODES = {500, 502, 503, 504}
+
+# Class-name fragments for transient server + network transport errors (httpx/httpcore,
+# google/grpc), matched by name so resilience.py needn't import those libraries.
+_TRANSIENT_NAME_FRAGMENTS = (
+    "servererror",
+    "serviceunavailable",
+    "internalservererror",
+    "deadlineexceeded",
+    "connecterror",
+    "connecttimeout",
+    "connectionerror",
+    "readtimeout",
+    "readerror",
+    "writeerror",
+    "pooltimeout",
+    "remoteprotocol",
+    "proxyerror",
+    "transporterror",
+    "timeout",
+)
+
 # Transient network errors we also retry (in addition to rate limits).
 DEFAULT_RETRY_ON: tuple[type[BaseException], ...] = (ConnectionError, TimeoutError)
 
@@ -69,9 +101,31 @@ def is_rate_limit_error(exc: BaseException) -> bool:
     return any(marker in msg for marker in _RATE_LIMIT_MARKERS)
 
 
+def is_transient_error(exc: BaseException) -> bool:
+    """True for errors worth retrying: rate limits + transient 5xx server errors.
+
+    Providers return 503 UNAVAILABLE ("high demand"), 500, 502, 504, and
+    deadline-exceeded errors that are temporary and clear on retry. These are
+    distinct from rate limits but handled by the same backoff.
+    """
+    if is_rate_limit_error(exc):
+        return True
+    # builtin network errors
+    if isinstance(exc, OSError):
+        return True
+    name = type(exc).__name__.lower()
+    if any(frag in name for frag in _TRANSIENT_NAME_FRAGMENTS):
+        return True
+    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+    if code in _TRANSIENT_CODES:
+        return True
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _TRANSIENT_MARKERS)
+
+
 def _retry_predicate(retry_on: tuple[type[BaseException], ...]) -> Callable[[BaseException], bool]:
     def predicate(exc: BaseException) -> bool:
-        return is_rate_limit_error(exc) or isinstance(exc, retry_on)
+        return is_transient_error(exc) or isinstance(exc, retry_on)
 
     return predicate
 
