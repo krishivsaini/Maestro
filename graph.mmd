@@ -1,0 +1,31 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	supervisor(supervisor)
+	research(research)
+	recover(recover)
+	degrade(degrade)
+	analyze(analyze)
+	critique(critique)
+	write(write)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> supervisor;
+	analyze --> critique;
+	critique -. &nbsp;revise&nbsp; .-> analyze;
+	critique -.-> write;
+	degrade --> analyze;
+	recover -.-> analyze;
+	recover -.-> degrade;
+	research -.-> analyze;
+	research -.-> degrade;
+	research -.-> recover;
+	supervisor --> research;
+	write --> __end__;
+	recover -.-> recover;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
