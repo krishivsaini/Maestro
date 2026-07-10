@@ -6,6 +6,7 @@ Proves the three parallelism guarantees:
   (c) a dependent subtask does not start before its dependencies are done.
 """
 
+import threading
 import time
 
 from maestro.scheduler import (
@@ -16,7 +17,7 @@ from maestro.scheduler import (
     ready_subtasks,
     run_schedule,
 )
-from maestro.state import Role, Subtask, SubtaskStatus
+from maestro.state import Evidence, Role, Subtask, SubtaskStatus
 
 EPS = 1e-3
 
@@ -58,8 +59,13 @@ def test_independent_run_concurrently_under_cap2():
     final, report = run_schedule(make_plan(), sleepy_worker(0.05), cap=2)
     assert is_complete(final)
     assert all(s.status == SubtaskStatus.done for s in final)
-    assert report.max_concurrency == 2, report  # r1 and r2 overlapped
-    assert report.max_concurrency <= report.cap  # never exceeded the cap
+    # (a) peak-concurrency counter proves two workers were live simultaneously
+    assert report.max_concurrency == 2, report
+    # (b) peak never exceeds the cap
+    assert report.max_concurrency <= report.cap
+    # (a, direct) the two researchers' wall-clock intervals actually OVERLAP
+    (r1s, r1e), (r2s, r2e) = report.start_end["r1"], report.start_end["r2"]
+    assert r1s < r2e and r2s < r1e, "r1 and r2 intervals did not overlap"
 
 
 def test_cap_of_one_serializes():
@@ -97,3 +103,92 @@ def test_blocked_subtasks_when_dependency_failed():
     blocked = blocked_subtasks(subs)
     assert {s.id for s in blocked} == {"analyze"}
     assert not is_complete(subs)  # analyze is still pending, blocked
+
+
+# ===========================================================================
+# Graph-level integration: prove the REAL `research` node fans out at runtime.
+# graph.png renders `research` as a single node; these tests confirm that node
+# actually runs the researchers concurrently (bounded) inside itself.
+# ===========================================================================
+class _ConcurrencyResearcher:
+    """A researcher stub that sleeps and records peak concurrent invocations."""
+
+    def __init__(self, delay: float = 0.05) -> None:
+        self.delay = delay
+        self._lock = threading.Lock()
+        self._live = 0
+        self.peak = 0
+        self.ends: dict[str, float] = {}
+
+    def run(self, subtask, *, tools=None, corpus=None, on_retry=None):
+        with self._lock:
+            self._live += 1
+            self.peak = max(self.peak, self._live)
+        time.sleep(self.delay)
+        with self._lock:
+            self._live -= 1
+            self.ends[subtask.id] = time.perf_counter()
+        done = subtask.model_copy(update={"status": SubtaskStatus.done, "result": "ok"})
+        return done, [Evidence(subtask_id=subtask.id, source="s", content="e")]
+
+
+def _graph_agents(researcher, make_stub, max_parallel):
+    from maestro.agents import Analyst, Critic, Writer
+    from maestro.agents.analyst import AnalysisModel
+    from maestro.agents.critic import CriticOutput
+    from maestro.agents.writer import WriterOutput
+    from maestro.config import Settings
+    from maestro.graph import MaestroAgents
+    from maestro.state import CriticDecision
+    from maestro.supervisor import heuristic_planner
+
+    timings: dict[str, float] = {}
+
+    def responder(schema, messages):
+        name = getattr(schema, "__name__", "")
+        if name == "AnalysisModel":
+            timings["analyst_start"] = time.perf_counter()
+            return AnalysisModel(content="analysis", claims=["c1"])
+        if name == "CriticOutput":
+            return CriticOutput(decision=CriticDecision.passed, feedback="")
+        if name == "WriterOutput":
+            return WriterOutput(content="brief", citations=["s"])
+        raise AssertionError(name)
+
+    model = make_stub(responder)
+    cfg = Settings(max_parallel=max_parallel, max_critic_iters=3)
+    agents = MaestroAgents(
+        researcher=researcher,
+        analyst=Analyst(model=model, settings=cfg),
+        critic=Critic(model=model, settings=cfg),
+        writer=Writer(model=model, settings=cfg),
+        settings=cfg,
+        planner=heuristic_planner,
+    )
+    return agents, timings
+
+
+def test_graph_research_node_fans_out_concurrently(make_stub):
+    from maestro.graph import run_goal
+
+    researcher = _ConcurrencyResearcher(delay=0.05)
+    agents, timings = _graph_agents(researcher, make_stub, max_parallel=2)
+    run_goal("Compare A and B for reliability", agents=agents)
+
+    # (a) the two researchers ran concurrently INSIDE the single `research` node
+    assert researcher.peak == 2, f"research node did not fan out (peak={researcher.peak})"
+    # (b) never exceeded MAX_PARALLEL
+    assert researcher.peak <= 2
+    # (c) the dependent analyst stage started only after both researchers finished
+    assert timings["analyst_start"] >= max(researcher.ends.values()) - EPS
+
+
+def test_graph_max_parallel_bounds_fanout(make_stub):
+    from maestro.graph import run_goal
+
+    researcher = _ConcurrencyResearcher(delay=0.03)
+    agents, _ = _graph_agents(researcher, make_stub, max_parallel=1)
+    run_goal("Compare A and B for reliability", agents=agents)
+
+    # cap=1 -> the real graph serializes the researchers (peak never reaches 2)
+    assert researcher.peak == 1, f"MAX_PARALLEL=1 not enforced in graph (peak={researcher.peak})"
