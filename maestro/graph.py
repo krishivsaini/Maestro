@@ -38,6 +38,7 @@ from .agents import Analyst, Critic, Researcher, Writer
 from .config import Settings, get_settings
 from .logging_config import get_logger
 from .loop_control import repeated_delegation, step_ceiling_reached, stuck_in_critic_loop
+from .memory import distill_findings
 from .scheduler import run_schedule
 from .state import (
     CriticDecision,
@@ -65,6 +66,7 @@ class MaestroAgents:
     planner: Optional[Planner] = None  # None -> LLM planner built on demand
     tools: object = None  # ToolRegistry; None -> DEFAULT_REGISTRY
     corpus: Optional[list] = None  # local retrieval corpus for offline research
+    memory: object = None  # LongTermMemory; None -> long-term memory disabled
 
 
 def build_default_agents(settings: Optional[Settings] = None) -> MaestroAgents:
@@ -131,14 +133,22 @@ def build_graph(
         if state.get("subtasks"):
             return {}
         subs = decompose(state["goal"], planner=ag.planner, settings=cfg)
-        ev = _ev(EventType.plan_produced, "supervisor",
-                 f"planned {len(subs)} subtasks: {[s.id for s in subs]}")
-        return {
+        events = [_ev(EventType.plan_produced, "supervisor",
+                      f"planned {len(subs)} subtasks: {[s.id for s in subs]}")]
+        update = {
             "subtasks": subs,
-            "trace": [ev],
             "step_count": state.get("step_count", 0) + 1,
             "status": RunStatus.running.value,
         }
+        # long-term memory recall (§14): inform this run with prior findings
+        if ag.memory is not None:
+            hits = ag.memory.query(state["thread_id"], state["goal"], k=3)
+            if hits:
+                update["memory_hits"] = hits
+                events.append(_ev(EventType.memory_recall, "supervisor",
+                                  f"recalled {len(hits)} prior finding(s) from long-term memory"))
+        update["trace"] = events
+        return update
 
     def research_node(state: MaestroState) -> dict:
         researchers = _researchers(state["subtasks"])
@@ -204,7 +214,8 @@ def build_graph(
         feedback = verdicts[-1].feedback if (verdicts and verdicts[-1].decision == CriticDecision.rejected) else None
         revision = state.get("critic_iterations", 0)
         updated, draft = ag.analyst.run(
-            analyst_st, state["goal"], state.get("evidence", []), feedback=feedback, revision=revision
+            analyst_st, state["goal"], state.get("evidence", []),
+            feedback=feedback, revision=revision, memory_hits=state.get("memory_hits", []),
         )
         ev = _ev(EventType.subagent_result, "analyst",
                  f"analysis draft rev {revision}", subtask_id=analyst_st.id)
@@ -282,6 +293,16 @@ def build_graph(
             events.append(_ev(EventType.halted, "supervisor", halt_reason))
         elif not critic_passed:
             events.append(_ev(EventType.degraded, "supervisor", "critic ceiling reached; not fully validated"))
+
+        # long-term memory write (§14): persist distilled findings for later turns
+        if ag.memory is not None:
+            findings = distill_findings(state.get("analysis"), answer)
+            for finding in findings:
+                ag.memory.add(state["thread_id"], finding)
+            if findings:
+                events.append(_ev(EventType.memory_write, "supervisor",
+                                  f"stored {len(findings)} finding(s) to long-term memory"))
+
         events.append(_ev(EventType.completed, "supervisor", f"run completed ({status})"))
         return {
             "final_output": answer,

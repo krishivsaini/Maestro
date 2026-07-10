@@ -14,7 +14,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from ..resilience import OnRetry
-from ..state import AnalysisDraft, Evidence, Role, Subtask, SubtaskStatus
+from ..state import AnalysisDraft, Evidence, MemoryItem, Role, Subtask, SubtaskStatus
 from .base import Subagent
 
 ANALYST_PROMPT = """You are an Analyst subagent in a multi-agent research system.
@@ -51,6 +51,7 @@ class Analyst(Subagent):
         *,
         feedback: Optional[str] = None,
         revision: int = 0,
+        memory_hits: Optional[list[MemoryItem]] = None,
         on_retry: Optional[OnRetry] = None,
     ) -> tuple[Subtask, AnalysisDraft]:
         """Return (updated subtask, analysis draft). ``revision`` tracks critic cycles."""
@@ -59,6 +60,9 @@ class Analyst(Subagent):
             f"Analysis task: {subtask.description}\n\n"
             f"Evidence:\n{_render_evidence(evidence)}"
         )
+        if memory_hits:
+            recalled = "\n".join(f"- {h.content}" for h in memory_hits)
+            human += f"\n\nRelevant prior findings recalled from this thread's long-term memory:\n{recalled}"
         if feedback:
             human += f"\n\nAddress this critic feedback in your revision:\n{feedback}"
 

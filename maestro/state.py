@@ -69,6 +69,8 @@ class EventType(str, Enum):
     subagent_result = "subagent_result"
     critic_pass = "critic_pass"
     critic_reject = "critic_reject"
+    memory_recall = "memory_recall"
+    memory_write = "memory_write"
     recovery = "recovery"
     rate_limit_backoff = "rate_limit_backoff"
     degraded = "degraded"
