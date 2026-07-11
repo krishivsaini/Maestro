@@ -72,6 +72,16 @@ def test_healthz(make_stub):
     assert r.status_code == 200 and r.json() == {"status": "ok"}
 
 
+def test_viewer_served_at_root(make_stub):
+    client = make_client(make_stub, [CriticDecision.passed], TraceStore(":memory:"))
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+    # the real viewer is served (not the fallback), and drives the SSE endpoints
+    assert "<title>Maestro" in r.text
+    assert 'id="score"' in r.text and "/run" in r.text
+
+
 def test_run_streams_coordination(make_stub):
     store = TraceStore(":memory:")
     client = make_client(make_stub, [CriticDecision.rejected, CriticDecision.passed], store)
@@ -88,6 +98,52 @@ def test_run_streams_coordination(make_stub):
     assert final["status"] == "completed"
     assert final["answer"]["content"] == "FINAL BRIEF"
     assert final["critic_iterations"] == 2
+
+
+def test_models_endpoint_and_stub_ignores_switch(make_stub):
+    client = make_client(make_stub, [CriticDecision.passed], TraceStore(":memory:"))
+    m = client.get("/models").json()
+    assert "default" in m and "fallback" in m
+    assert m["switchable"] is False  # injected stub agents are not model-switchable
+    # a model override is accepted but harmless with stub agents (uses the default graph)
+    r = client.post("/run", json={"goal": "Compare solar and wind", "model": m["fallback"]})
+    assert r.status_code == 200
+    final = _parse_sse(r.text)[-1]
+    assert final["status"] == "completed" and final["model"] == m["default"]
+
+
+def test_api_key_is_never_echoed(make_stub):
+    # bring-your-own-key must be used transiently and never reflected back to the client.
+    client = make_client(make_stub, [CriticDecision.passed], TraceStore(":memory:"))
+    m = client.get("/models").json()
+    assert "has_server_key" in m
+    secret = "AIzaSY-TOTALLY-FAKE-SECRET-KEY-123"
+    r = client.post("/run", json={"goal": "Compare solar and wind", "api_key": secret})
+    assert r.status_code == 200
+    assert secret not in r.text  # the key never appears in the stream
+
+
+def test_run_degrades_gracefully_on_terminal_failure(make_stub):
+    # A terminal planner/LLM failure (e.g. free-tier quota exhausted) must produce a
+    # clean error frame, not abort the chunked stream (what caused ERR_INCOMPLETE_CHUNKED_ENCODING).
+    store = TraceStore(":memory:")
+    agents = build_stub_agents(make_stub, [CriticDecision.passed])
+
+    def boom(goal, roles, max_subtasks):
+        raise RuntimeError("429 RESOURCE_EXHAUSTED: quota exceeded")
+
+    agents.planner = boom
+    client = TestClient(create_app(agents=agents, trace_store=store))
+
+    r = client.post("/run", json={"goal": "Compare A and B"})
+    assert r.status_code == 200
+    events = _parse_sse(r.text)
+    types = [e["type"] for e in events]
+    assert "error" in types  # a clean error event was streamed
+    final = events[-1]
+    assert final["type"] == "final" and final["status"] == "error"
+    assert final["error"] and "quota" in final["error"].lower()
+    assert client.get("/runs").json()["runs"] == []  # a failed run is not persisted as completed
 
 
 def test_run_is_persisted_and_replayable(make_stub):

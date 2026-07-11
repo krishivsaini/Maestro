@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Maestro — the conductor's score</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --stage: #16121d; --stage-2: #1d1727; --stage-3: #271f34; --line: #372f47;
+    --ivory: #f0e9dc; --muted: #9a8fa8;
+    --brass: #d8a63f; --brass-soft: #eacd82;
+    --v-supervisor: #d8a63f; --v-researcher: #45b8a4; --v-analyst: #6c8ff0;
+    --v-critic: #e0685c; --v-writer: #b07de6; --v-memory: #9d8ec9;
+    --amber: #e0973c; --green: #5bbf7a; --red: #d9534f;
+    --font-display: "Instrument Serif", Georgia, serif;
+    --font-ui: "Space Grotesk", system-ui, -apple-system, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --lane-h: 76px; --beat-w: 210px; --note-w: 184px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background:
+      radial-gradient(1200px 480px at 78% -8%, rgba(216,166,63,.10), transparent 60%),
+      radial-gradient(900px 500px at 5% 4%, rgba(108,143,240,.07), transparent 55%),
+      var(--stage);
+    color: var(--ivory); font-family: var(--font-ui);
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 30px 26px 80px; }
+
+  /* ---- header / hero ---- */
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: baseline; gap: 16px; }
+  .mark {
+    font-family: var(--font-display); font-size: 62px; line-height: .9; letter-spacing: .5px;
+    background: linear-gradient(180deg, var(--brass-soft), var(--brass));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .baton { font-style: italic; color: var(--muted); font-family: var(--font-display); font-size: 26px; }
+  .tagline { color: var(--muted); font-size: 13.5px; max-width: 340px; text-align: right; }
+  .tagline b { color: var(--ivory); font-weight: 500; }
+  .rule { height: 1px; margin: 22px 0 24px;
+    background: linear-gradient(90deg, transparent, var(--line) 12%, var(--line) 88%, transparent); }
+
+  /* ---- commission bar ---- */
+  .commission { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .field { position: relative; flex: 1 1 380px; min-width: 240px; }
+  .field label { position: absolute; top: -8px; left: 12px; padding: 0 6px; background: var(--stage);
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  input[type=text] {
+    width: 100%; background: var(--stage-2); border: 1px solid var(--line); color: var(--ivory);
+    padding: 13px 15px; border-radius: 3px; font: inherit; font-size: 15px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--brass); box-shadow: 0 0 0 3px rgba(216,166,63,.14); }
+  #thread { flex: 0 1 190px; min-width: 150px; }
+  #thread input { font-family: var(--font-mono); font-size: 13px; }
+  button.conduct {
+    background: linear-gradient(180deg, var(--brass-soft), var(--brass)); color: #201400; border: 0;
+    font-family: var(--font-ui); font-weight: 700; font-size: 15px; letter-spacing: .3px;
+    padding: 13px 24px; border-radius: 3px; cursor: pointer; white-space: nowrap;
+  }
+  button.conduct:hover { filter: brightness(1.06); }
+  button.conduct:disabled { opacity: .5; cursor: default; filter: none; }
+  button.conduct:focus-visible { outline: 2px solid var(--brass-soft); outline-offset: 2px; }
+  .examples { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .examples span {
+    color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 11px; border-radius: 2px;
+    border: 1px solid var(--line); font-family: var(--font-mono);
+  }
+  .examples span:hover { color: var(--ivory); border-color: var(--v-researcher); }
+
+  .modelbar { display: none; align-items: center; gap: 11px; margin-top: 13px; flex-wrap: wrap; }
+  .modelbar .mlabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .segbtn { background: var(--stage-2); color: var(--muted); border: 0; font-family: var(--font-mono); font-size: 12px; padding: 6px 13px; cursor: pointer; }
+  .segbtn + .segbtn { border-left: 1px solid var(--line); }
+  .segbtn.active { background: linear-gradient(180deg, var(--brass-soft), var(--brass)); color: #201400; font-weight: 600; }
+  .segbtn:not(.active):hover { color: var(--ivory); }
+  .mnote { font-family: var(--font-mono); font-size: 11.5px; color: var(--amber); }
+
+  .keyctl { margin-top: 13px; }
+  .keytoggle { font-family: var(--font-mono); font-size: 12px; color: var(--muted); cursor: pointer;
+    border: 1px dashed var(--line); border-radius: 2px; padding: 5px 12px; }
+  .keytoggle:hover { color: var(--ivory); border-color: var(--brass); }
+  .keyrow { display: none; margin-top: 12px; gap: 11px; flex-wrap: wrap; align-items: center; }
+  .keyrow.show { display: flex; }
+  .keyrow .field { flex: 1 1 320px; }
+  .keynote { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .keynote a { color: var(--v-researcher); }
+  #keymsg { font-family: var(--font-mono); font-size: 11.5px; color: var(--amber); }
+
+  /* ---- tempo / dynamics readout ---- */
+  .tempo { display: none; gap: 26px; flex-wrap: wrap; margin: 24px 2px 6px; }
+  .tempo.show { display: flex; }
+  .tempo .m { display: flex; flex-direction: column; gap: 1px; }
+  .tempo .m b { font-family: var(--font-mono); font-size: 19px; font-weight: 600; }
+  .tempo .m small { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+
+  /* ---- the score ---- */
+  .score-title { display: flex; align-items: baseline; gap: 12px; margin: 26px 2px 12px; }
+  .score-title h2 { font-family: var(--font-display); font-weight: 400; font-size: 27px; margin: 0; }
+  .score-title span { color: var(--muted); font-size: 12px; font-family: var(--font-mono); letter-spacing: 1px; }
+
+  .score {
+    position: relative; display: grid; grid-template-columns: 150px 1fr;
+    border: 1px solid var(--line); border-radius: 5px; background:
+      linear-gradient(180deg, rgba(255,255,255,.012), transparent 40%), var(--stage-2);
+    overflow: hidden; min-height: 300px;
+  }
+  .gutter { position: relative; z-index: 3; border-right: 1px solid var(--line); background: var(--stage-2); }
+  .gutter .lane-label {
+    height: var(--lane-h); padding: 0 12px; display: flex; flex-direction: column; justify-content: center;
+    border-bottom: 1px solid rgba(255,255,255,.03); position: relative;
+  }
+  .gutter .lane-label::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px;
+    background: var(--voice, var(--muted)); border-radius: 0 2px 2px 0; }
+  .lane-label .nm { font-family: var(--font-mono); font-size: 12.5px; font-weight: 500; color: var(--ivory);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lane-label .rl { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+
+  .canvas-wrap { overflow-x: auto; overflow-y: hidden; position: relative; scroll-behavior: smooth; }
+  .canvas { position: relative; height: 100%; }
+  .lane-rule { position: absolute; left: 0; right: 0; height: var(--lane-h);
+    border-bottom: 1px solid rgba(255,255,255,.03); }
+  .lane-rule::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 6px, transparent 6px 13px); }
+
+  .note {
+    position: absolute; width: var(--note-w); border: 1px solid var(--line);
+    border-left: 3px solid var(--voice, var(--muted)); border-radius: 4px;
+    background: linear-gradient(180deg, var(--stage-3), var(--stage-2));
+    padding: 7px 10px 8px; z-index: 2; box-shadow: 0 6px 16px rgba(0,0,0,.28);
+  }
+  .note .top { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
+  .note .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--voice, var(--muted)); flex: none;
+    box-shadow: 0 0 8px var(--voice, transparent); }
+  .note .lab { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 1.4px;
+    color: var(--voice, var(--ivory)); }
+  .note .chip { margin-left: auto; font-family: var(--font-mono); font-size: 9px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; max-width: 88px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note .sum { font-family: var(--font-mono); font-size: 11px; line-height: 1.35; color: #d7cebf;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .note.enter { animation: strike .34s cubic-bezier(.2,.8,.2,1); }
+  @keyframes strike { from { opacity: 0; transform: translateY(7px) scale(.97); } to { opacity: 1; transform: none; } }
+
+  .arcs { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: visible; }
+  .arcs path { fill: none; stroke: var(--v-critic); stroke-width: 2; opacity: .9;
+    stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw .7s ease forwards; }
+  .arcs .cap { fill: var(--v-critic); }
+  .arcs text { fill: var(--v-critic); font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 1px; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  .playhead { position: absolute; top: 0; bottom: 0; width: 2px; z-index: 4; pointer-events: none;
+    background: linear-gradient(180deg, transparent, var(--brass) 12%, var(--brass) 88%, transparent);
+    box-shadow: 0 0 14px 1px rgba(216,166,63,.5); transition: left .35s cubic-bezier(.3,.7,.3,1); opacity: 0; }
+  .playhead.on { opacity: 1; }
+  .playhead::before { content: ""; position: absolute; top: -1px; left: -4px; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--brass); box-shadow: 0 0 12px var(--brass); }
+
+  /* ---- ensemble (pre-run) ---- */
+  .ensemble { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px; text-align: center; padding: 30px; }
+  .ensemble p { color: var(--muted); margin: 0; font-size: 14px; max-width: 460px; }
+  .ensemble .players { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .player { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; }
+  .player .disc { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--voice);
+    background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--voice) 55%, transparent), transparent 70%); }
+  .player .pn { font-family: var(--font-mono); font-size: 11px; color: var(--ivory); }
+  .player .pr { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+
+  /* ---- finished score (final brief) ---- */
+  .coda { display: none; margin-top: 22px; border: 1px solid var(--line); border-radius: 5px;
+    background: var(--stage-2); padding: 22px 24px; }
+  .coda.show { display: block; }
+  .coda h3 { font-family: var(--font-display); font-weight: 400; font-size: 24px; margin: 0 0 4px; }
+  .coda .status-line { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; color: var(--muted);
+    text-transform: uppercase; margin-bottom: 14px; }
+  .coda .brief { line-height: 1.7; font-size: 15px; }
+  .coda .brief > :first-child { margin-top: 0; }
+  .coda .brief h2, .coda .brief h3, .coda .brief h4 { font-family: var(--font-display); font-weight: 400; line-height: 1.18; color: var(--ivory); margin: 20px 0 8px; }
+  .coda .brief h2 { font-size: 25px; }
+  .coda .brief h3 { font-size: 21px; }
+  .coda .brief h4 { font-size: 17px; letter-spacing: .3px; color: var(--brass-soft); }
+  .coda .brief p { margin: 10px 0; }
+  .coda .brief ul, .coda .brief ol { margin: 8px 0; padding-left: 22px; }
+  .coda .brief li { margin: 5px 0; }
+  .coda .brief li::marker { color: var(--brass); }
+  .coda .brief strong { color: var(--ivory); font-weight: 700; }
+  .coda .brief em { color: #e4dccd; }
+  .coda .brief code { font-family: var(--font-mono); font-size: 13px; background: var(--stage-3); padding: 1px 5px; border-radius: 3px; }
+  .coda .brief sup.cite { color: var(--brass); font-family: var(--font-mono); font-size: 10px; font-weight: 600; }
+  .coda .brief a { color: var(--v-researcher); }
+  .coda .flag { margin-top: 12px; color: var(--amber); font-size: 13px; font-family: var(--font-mono); }
+  .coda .sources { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .coda .sources .h { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .coda .sources ul { margin: 0; padding-left: 18px; color: #cfc6b8; font-family: var(--font-mono); font-size: 12.5px; }
+  .coda .sources li { margin: 3px 0; word-break: break-all; }
+
+  /* ---- repertoire (past runs) ---- */
+  .repertoire { margin-top: 40px; }
+  .repertoire h2 { font-family: var(--font-display); font-weight: 400; font-size: 24px; margin: 0 0 4px; }
+  .repertoire .sub { color: var(--muted); font-size: 12px; font-family: var(--font-mono); margin-bottom: 14px; }
+  .repertoire .sub button { background: none; border: 1px solid var(--line); color: var(--muted);
+    font-family: var(--font-mono); font-size: 10px; padding: 3px 10px; border-radius: 2px; cursor: pointer; margin-left: 8px; }
+  .repertoire .sub button:hover { color: var(--ivory); border-color: var(--brass); }
+  .runlist { display: flex; flex-direction: column; gap: 7px; }
+  .runitem { display: flex; gap: 14px; align-items: center; padding: 11px 15px; cursor: pointer;
+    background: var(--stage-2); border: 1px solid var(--line); border-radius: 4px; }
+  .runitem:hover { border-color: var(--brass); }
+  .runitem .st { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; padding: 3px 9px; border-radius: 10px; border: 1px solid var(--line); }
+  .runitem .st.completed { color: var(--green); } .runitem .st.degraded { color: var(--amber); }
+  .runitem .st.halted, .runitem .st.error { color: var(--red); }
+  .runitem .g { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  .runitem .meta { color: var(--muted); font-size: 11px; font-family: var(--font-mono); white-space: nowrap; }
+  .empty { color: var(--muted); font-size: 13px; font-family: var(--font-mono); }
+
+  @media (max-width: 640px) {
+    .mark { font-size: 46px; } .tagline { display: none; }
+    .score { grid-template-columns: 112px 1fr; } :root { --beat-w: 176px; --note-w: 156px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .note.enter, .arcs path { animation: none; } .playhead { transition: none; }
+    .canvas-wrap { scroll-behavior: auto; } .arcs path { stroke-dashoffset: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <span class="mark">Maestro</span>
+      <span class="baton">a conductor's score</span>
+    </div>
+    <div class="tagline">A supervisor <b>conducts</b> role-specialized agents through a goal — decompose, delegate in parallel, critique, recover. Watch the coordination <b>play</b>.</div>
+  </header>
+  <div class="rule"></div>
+
+  <div class="commission">
+    <div class="field"><label>the goal</label>
+      <input id="goal" type="text" placeholder="Compare X and Y for Z, and recommend one." /></div>
+    <div class="field" id="thread"><label>thread</label>
+      <input id="threadin" type="text" placeholder="optional" /></div>
+    <button class="conduct" id="run">Conduct&nbsp;▸</button>
+  </div>
+  <div class="examples" id="examples"></div>
+
+  <div class="modelbar" id="modelbar">
+    <span class="mlabel">model</span>
+    <div class="seg">
+      <button class="segbtn active" id="seg-default">primary</button>
+      <button class="segbtn" id="seg-fallback">lite</button>
+    </div>
+    <span class="mnote" id="mnote"></span>
+  </div>
+
+  <div class="keyctl"><span class="keytoggle" id="keytoggle">🔑 use your own key</span></div>
+  <div class="keyrow" id="keyrow">
+    <div class="field"><label>gemini api key</label>
+      <input id="keyin" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…  ·  optional, runs on your quota" /></div>
+    <span class="keynote">stays in your browser · sent only to this server · never stored or logged · <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">get a free key ↗</a></span>
+    <span id="keymsg"></span>
+  </div>
+
+  <div class="tempo" id="tempo">
+    <div class="m"><b id="t-status">—</b><small>movement</small></div>
+    <div class="m"><b id="t-subtasks">0</b><small>voices</small></div>
+    <div class="m"><b id="t-critic">0</b><small>critic passes</small></div>
+    <div class="m"><b id="t-recover">0</b><small>recoveries</small></div>
+    <div class="m"><b id="t-run" style="color:var(--muted);font-size:12px">—</b><small>run</small></div>
+  </div>
+
+  <div class="score-title"><h2>The score</h2><span id="score-hint">one stave per agent · time flows right · brass = the conductor</span></div>
+  <div class="score" id="score">
+    <div class="gutter" id="gutter"></div>
+    <div class="canvas-wrap" id="cwrap">
+      <div class="canvas" id="canvas">
+        <svg class="arcs" id="arcs"></svg>
+        <div class="playhead" id="playhead"></div>
+      </div>
+    </div>
+    <div class="ensemble" id="ensemble">
+      <div class="players" id="players"></div>
+      <p>Give Maestro a goal and press <b style="color:var(--brass)">Conduct</b>. The supervisor decomposes it at runtime and delegates to each voice; independent research plays in parallel, the critic can send work back, and failures recover in the open.</p>
+    </div>
+  </div>
+
+  <div class="coda" id="coda">
+    <h3>The finished score</h3>
+    <div class="status-line" id="coda-status"></div>
+    <div class="brief" id="coda-brief"></div>
+    <div class="flag" id="coda-flag"></div>
+    <div class="sources" id="coda-sources" style="display:none"></div>
+  </div>
+
+  <div class="repertoire">
+    <h2>Repertoire</h2>
+    <div class="sub">past performances — click to replay<button id="refresh">refresh</button></div>
+    <div class="runlist" id="runlist"><div class="empty">Nothing performed yet.</div></div>
+  </div>
+</div>
+
+<script>
+const EXAMPLES = [
+  "Compare solar and wind energy for grid reliability, and recommend one.",
+  "Should a startup use PostgreSQL or MongoDB for its first product?",
+  "Compare REST and GraphQL for a public API and recommend one.",
+];
+const VOICE = { supervisor: "--v-supervisor", researcher: "--v-researcher", analyst: "--v-analyst",
+  critic: "--v-critic", writer: "--v-writer" };
+const LABEL = { run_started:"RAISE", plan_produced:"SCORE", plan_replanned:"RESCORE",
+  subtask_dispatched:"CUE", subagent_result:"PLAY", critic_pass:"PASS", critic_reject:"REJECT",
+  recovery:"RECOVER", rate_limit_backoff:"HOLD", degraded:"MUTE", memory_recall:"RECALL",
+  memory_write:"STORE", halted:"HALT", completed:"CODA", error:"ERROR" };
+const OVERRIDE = { critic_pass:"--green", critic_reject:"--v-critic", recovery:"--amber",
+  rate_limit_backoff:"--amber", degraded:"--amber", halted:"--red", error:"--red",
+  completed:"--brass", memory_recall:"--v-memory", memory_write:"--v-memory" };
+const ENSEMBLE = [["supervisor","conductor"],["researcher","strings"],["researcher","strings"],
+  ["analyst","woodwind"],["critic","reed"],["writer","brass"]];
+
+const $ = (id) => document.getElementById(id);
+const cwrap = $("cwrap"), canvas = $("canvas"), gutter = $("gutter"), arcs = $("arcs"), playhead = $("playhead");
+const cssv = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// model selection — primary vs the higher-throughput fallback (for when the free tier throttles)
+let MODELS = { default: null, fallback: null }, currentModel = null;
+const shortModel = (id) => (id ? id.replace(/^gemini-/, "") : "—");
+function setModel(role) {
+  currentModel = role === "fallback" ? MODELS.fallback : MODELS.default;
+  $("seg-default").classList.toggle("active", role === "default");
+  $("seg-fallback").classList.toggle("active", role === "fallback");
+}
+async function loadModels() {
+  try {
+    MODELS = await (await fetch("/models")).json();
+    currentModel = MODELS.default;
+    $("seg-default").textContent = shortModel(MODELS.default);
+    $("seg-fallback").textContent = shortModel(MODELS.fallback);
+    $("seg-default").title = MODELS.default; $("seg-fallback").title = MODELS.fallback;
+    if (MODELS.switchable && MODELS.fallback && MODELS.fallback !== MODELS.default)
+      $("modelbar").style.display = "flex";
+    if (MODELS.has_server_key === false) {  // server has no key -> the visitor must bring one
+      keyRequired = true;
+      $("keytoggle").textContent = "🔑 API key required";
+      $("keyin").placeholder = "AIza…  ·  required — this server has no key of its own";
+      toggleKey(true);
+    }
+  } catch (_) { /* server starting */ }
+}
+$("seg-default").onclick = () => { setModel("default"); $("mnote").textContent = ""; };
+$("seg-fallback").onclick = () => { setModel("fallback"); $("mnote").textContent = ""; };
+
+// bring-your-own-key
+let keyRequired = false;
+function toggleKey(force) {
+  const kr = $("keyrow");
+  const show = force === undefined ? !kr.classList.contains("show") : force;
+  kr.classList.toggle("show", show);
+  if (show) $("keyin").focus();
+}
+$("keytoggle").onclick = () => { $("keymsg").textContent = ""; toggleKey(); };
+
+let lanes, laneMap, beat, prevKey, notes, pendingReject, laneCount, silence;
+const PAD_X = 22, PAD_Y = 10, NOTE_H = 56;
+
+// heartbeat: if the model goes quiet (e.g. rate-limit backoff inside one node),
+// say so instead of leaving a dead "playing…".
+function pokeSilence(active) {
+  clearTimeout(silence);
+  if (!active) return;
+  $("t-status").textContent = "playing…"; $("t-status").style.color = "var(--ivory)";
+  silence = setTimeout(() => {
+    $("t-status").textContent = "backing off…"; $("t-status").style.color = "var(--amber)";
+  }, 5000);
+}
+const LANE_H = () => parseInt(cssv("--lane-h")), BEAT_W = () => parseInt(cssv("--beat-w")), NOTE_W = () => parseInt(cssv("--note-w"));
+
+function voiceFor(kind, agent) {
+  if (OVERRIDE[kind]) return cssv(OVERRIDE[kind]);
+  return cssv(VOICE[agent] || "--muted") || cssv("--muted");
+}
+function laneKey(ev) {
+  const kind = ev.type || ev.event_type, agent = ev.agent || "", sid = ev.subtask_id;
+  if (agent === "researcher" && sid) return { key: "r:" + sid, nm: sid, rl: "researcher", agent: "researcher" };
+  if ((kind === "recovery" || kind === "degraded") && sid && laneMap["r:" + sid])
+    return { key: "r:" + sid, nm: sid, rl: "researcher", agent: "researcher" };
+  const nm = agent ? agent[0].toUpperCase() + agent.slice(1) : "system";
+  const rl = { supervisor: "conductor", analyst: "synthesis", critic: "review", writer: "compose" }[agent] || "voice";
+  return { key: "role:" + agent, nm, rl, agent };
+}
+function ensureLane(info) {
+  if (laneMap[info.key]) return laneMap[info.key];
+  const idx = laneCount++;
+  const lane = { ...info, idx };
+  laneMap[info.key] = lane; lanes.push(lane);
+  const v = cssv(VOICE[info.agent] || "--muted");
+  const lbl = document.createElement("div");
+  lbl.className = "lane-label"; lbl.style.setProperty("--voice", v);
+  lbl.innerHTML = `<div class="nm">${esc(info.nm)}</div><div class="rl">${esc(info.rl)}</div>`;
+  gutter.appendChild(lbl);
+  const rule = document.createElement("div");
+  rule.className = "lane-rule"; rule.style.top = (idx * LANE_H()) + "px";
+  canvas.insertBefore(rule, arcs);
+  const h = laneCount * LANE_H();
+  canvas.style.height = h + "px"; gutter.style.minHeight = h + "px";
+  return lane;
+}
+function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+
+function addNote(ev) {
+  const kind = ev.type || ev.event_type, agent = ev.agent || "";
+  const info = laneKey(ev), lane = ensureLane(info);
+  const key = kind + "|" + agent;
+  if (prevKey !== null && key !== prevKey) beat++;
+  prevKey = key;
+  const v = voiceFor(kind, agent);
+  const x = PAD_X + beat * BEAT_W(), y = PAD_Y + lane.idx * LANE_H();
+  const el = document.createElement("div");
+  el.className = "note enter"; el.style.setProperty("--voice", v);
+  el.style.left = x + "px"; el.style.top = y + "px";
+  const chip = ev.subtask_id ? `<span class="chip">${esc(ev.subtask_id)}</span>` : "";
+  el.innerHTML = `<div class="top"><span class="dot"></span><span class="lab">${LABEL[kind] || kind}</span>${chip}</div>` +
+                 `<div class="sum">${esc(ev.summary || "")}</div>`;
+  canvas.appendChild(el);
+  const note = { beat, laneIdx: lane.idx, x, y, kind, agent };
+  notes.push(note);
+
+  // signature: critic REJECT -> next analyst PLAY draws a loop-back arc
+  if (kind === "critic_reject") pendingReject = note;
+  else if (kind === "subagent_result" && agent === "analyst" && pendingReject) {
+    drawArc(pendingReject, note); pendingReject = null;
+  }
+  extendCanvas(); movePlayhead();
+}
+
+function extendCanvas() {
+  const w = PAD_X * 2 + (beat + 1) * BEAT_W() + (NOTE_W() - BEAT_W() > 0 ? NOTE_W() - BEAT_W() : 0);
+  canvas.style.width = Math.max(w, cwrap.clientWidth) + "px";
+  arcs.setAttribute("width", canvas.style.width.replace("px", ""));
+  arcs.setAttribute("height", (laneCount * LANE_H()) || 300);
+}
+function movePlayhead() {
+  const px = PAD_X + beat * BEAT_W() + NOTE_W() / 2;
+  playhead.style.left = px + "px"; playhead.classList.add("on");
+  cwrap.scrollLeft = Math.max(0, px - cwrap.clientWidth * 0.62);
+}
+function drawArc(from, to) {
+  const x1 = from.x + NOTE_W(), y1 = from.y + NOTE_H / 2;
+  const x2 = to.x, y2 = to.y + NOTE_H / 2;
+  const cx = Math.max(x1, x2) + 46, cy = (y1 + y2) / 2;
+  const d = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", d);
+  const len = Math.hypot(cx - x1, 0) + Math.abs(y2 - y1) + Math.hypot(x2 - cx, 0) + 40;
+  p.style.setProperty("--len", len);
+  const head = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  head.setAttribute("cx", x2); head.setAttribute("cy", y2); head.setAttribute("r", 3.5); head.setAttribute("class", "cap");
+  const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  t.setAttribute("x", cx + 6); t.setAttribute("y", cy + 3); t.textContent = "sent back";
+  arcs.appendChild(p); arcs.appendChild(head); arcs.appendChild(t);
+}
+
+function resetScore() {
+  lanes = []; laneMap = {}; beat = 0; prevKey = null; notes = []; pendingReject = null; laneCount = 0;
+  gutter.innerHTML = "";
+  [...canvas.querySelectorAll(".note, .lane-rule")].forEach((n) => n.remove());
+  arcs.innerHTML = ""; canvas.style.width = ""; canvas.style.height = "";
+  playhead.classList.remove("on"); playhead.style.left = "0px";
+  $("ensemble").style.display = "none"; $("coda").classList.remove("show");
+  $("tempo").classList.add("show");
+  $("t-status").textContent = "playing…"; $("t-status").style.color = "var(--ivory)";
+  ["t-subtasks","t-critic","t-recover"].forEach((i) => $(i).textContent = "0");
+  $("t-run").textContent = "—";
+}
+
+// minimal, self-contained markdown -> html for the final brief. Escapes first, then
+// only introduces a known set of tags, so model output can't inject markup.
+function mdInline(s) {
+  s = esc(s);
+  s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  s = s.replace(/\[(\d+)\]/g, '<sup class="cite">[$1]</sup>');
+  return s;
+}
+function mdToHtml(src) {
+  let html = "", list = null;
+  const closeList = () => { if (list) { html += `</${list}>`; list = null; } };
+  for (const raw of (src || "").split(/\r?\n/)) {
+    const line = raw.replace(/\s+$/, "");
+    if (!line.trim()) { closeList(); continue; }
+    let m;
+    if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
+      closeList();
+      const n = m[1].length;  // briefs often start at ###; compress so they stay prominent
+      const lvl = n <= 2 ? 2 : n === 3 ? 3 : 4;
+      html += `<h${lvl}>${mdInline(m[2])}</h${lvl}>`;
+    } else if ((m = line.match(/^\s*[-*]\s+(.*)$/))) {
+      if (list !== "ul") { closeList(); html += "<ul>"; list = "ul"; }
+      html += `<li>${mdInline(m[1])}</li>`;
+    } else if ((m = line.match(/^\s*\d+\.\s+(.*)$/))) {
+      if (list !== "ol") { closeList(); html += "<ol>"; list = "ol"; }
+      html += `<li>${mdInline(m[1])}</li>`;
+    } else {
+      closeList();
+      html += `<p>${mdInline(line)}</p>`;
+    }
+  }
+  closeList();
+  return html;
+}
+
+function showFinal(f) {
+  pokeSilence(false);
+  $("tempo").classList.add("show");
+  const st = f.status || "—";
+  $("t-status").textContent = st;
+  const c = { completed: "--green", degraded: "--amber", halted: "--red", error: "--red" }[st];
+  $("t-status").style.color = c ? `var(${c})` : "var(--ivory)";
+  if (f.subtasks) $("t-subtasks").textContent = f.subtasks.length;
+  $("t-critic").textContent = f.critic_iterations ?? 0;
+  $("t-recover").textContent = f.recovery_attempts ?? 0;
+  if (f.run_id) $("t-run").textContent = f.run_id.slice(0, 8);
+  const ans = f.answer || f.final_output;
+  const coda = $("coda");
+  if (ans && ans.content) {
+    coda.classList.add("show");
+    $("coda-status").textContent = `${st} · ${f.subtasks ? f.subtasks.length : "?"} voices · ${f.critic_iterations ?? 0} critic pass · ${f.recovery_attempts ?? 0} recoveries`;
+    $("coda-brief").innerHTML = mdToHtml(ans.content);
+    $("coda-flag").textContent = ans.validated === false ? "⚠ degraded — not fully validated (critic ceiling reached)" : "";
+    const cites = ans.citations || [], src = $("coda-sources");
+    if (cites.length) { src.style.display = "block";
+      src.innerHTML = `<div class="h">sources</div><ul>${cites.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>`; }
+    else src.style.display = "none";
+  } else if (f.error) {
+    coda.classList.add("show");
+    $("coda-status").textContent = st; $("coda-brief").textContent = "";
+    $("coda-flag").textContent = "✗ " + f.error; $("coda-sources").style.display = "none";
+    // if the primary model is throttled, offer the fallback right in the UI
+    if (/quota|rate limit/i.test(f.error) && MODELS.fallback && currentModel === MODELS.default) {
+      setModel("fallback");
+      $("mnote").textContent = `↳ ${shortModel(MODELS.default)} is rate-limited — switched to ${shortModel(MODELS.fallback)}. Press Conduct again.`;
+    }
+    // if the key was rejected, surface the key field so it can be corrected
+    if (/api key/i.test(f.error)) { toggleKey(true); $("keymsg").textContent = "the key was rejected — check it and try again."; }
+  }
+}
+
+async function conduct() {
+  const goal = $("goal").value.trim();
+  if (!goal) { $("goal").focus(); return; }
+  const thread_id = $("threadin").value.trim() || null;
+  const api_key = $("keyin").value.trim() || null;
+  if (keyRequired && !api_key) {
+    toggleKey(true); $("keymsg").textContent = "paste a Gemini API key to run."; return;
+  }
+  $("run").disabled = true; resetScore();
+  try {
+    const resp = await fetch("/run", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal, thread_id, model: currentModel, api_key }) });
+    if (!resp.ok || !resp.body) throw new Error("HTTP " + resp.status);
+    const reader = resp.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+        const line = frame.split("\n").find((l) => l.startsWith("data:"));
+        if (!line) continue;
+        const ev = JSON.parse(line.slice(5).trim());
+        if (ev.type === "run_started") { $("t-run").textContent = ev.run_id.slice(0, 8); addNote(ev); pokeSilence(true); }
+        else if (ev.type === "final") showFinal(ev);
+        else { addNote(ev); pokeSilence(true); }
+      }
+    }
+  } catch (e) {
+    addNote({ type: "error", agent: "supervisor", summary: "stream failed: " + e.message });
+    $("t-status").textContent = "error"; $("t-status").style.color = "var(--red)";
+  } finally { pokeSilence(false); $("run").disabled = false; loadRuns(); }
+}
+
+async function loadRuns() {
+  try {
+    const r = await fetch("/runs"); const { runs } = await r.json();
+    const list = $("runlist");
+    if (!runs || !runs.length) { list.innerHTML = '<div class="empty">Nothing performed yet.</div>'; return; }
+    list.innerHTML = "";
+    for (const run of runs) {
+      const el = document.createElement("div"); el.className = "runitem";
+      el.innerHTML = `<span class="st ${esc(run.status)}">${esc(run.status)}</span>` +
+        `<span class="g">${esc(run.goal)}</span>` +
+        `<span class="meta">${run.event_count ?? 0} beats</span>`;
+      el.onclick = () => replay(run.run_id); list.appendChild(el);
+    }
+  } catch (_) { /* server starting */ }
+}
+async function replay(runId) {
+  const r = await fetch("/runs/" + runId); if (!r.ok) return;
+  const rec = await r.json(); resetScore();
+  for (const ev of rec.events || []) addNote(ev);
+  showFinal(rec);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// wire up
+$("run").onclick = conduct;
+$("goal").addEventListener("keydown", (e) => { if (e.key === "Enter") conduct(); });
+$("refresh").onclick = loadRuns;
+const ex = $("examples");
+for (const g of EXAMPLES) {
+  const s = document.createElement("span");
+  s.textContent = g.length > 50 ? g.slice(0, 50) + "…" : g;
+  s.title = g; s.onclick = () => { $("goal").value = g; $("goal").focus(); };
+  ex.appendChild(s);
+}
+const pl = $("players");
+for (const [role, sect] of ENSEMBLE) {
+  const el = document.createElement("div"); el.className = "player";
+  el.style.setProperty("--voice", cssv(VOICE[role]));
+  el.innerHTML = `<div class="disc"></div><div class="pn">${role[0].toUpperCase() + role.slice(1)}</div><div class="pr">${sect}</div>`;
+  pl.appendChild(el);
+}
+loadModels();
+loadRuns();
+</script>
+</body>
+</html>
