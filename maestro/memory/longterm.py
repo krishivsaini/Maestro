@@ -94,6 +94,7 @@ class LongTermMemory:
         if self.index is None:
             import faiss
 
+            faiss.omp_set_num_threads(1)  # tiny index; single-thread avoids the OMP race
             self.dim = dim
             self.index = faiss.IndexFlatIP(dim)
 
