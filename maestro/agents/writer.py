@@ -35,6 +35,28 @@ def _render_evidence(evidence: list[Evidence]) -> str:
     return "\n".join(f"[{i}] ({e.source}) {e.content}" for i, e in enumerate(evidence, start=1))
 
 
+def _resolve_citations(raw: list[str], evidence: list[Evidence]) -> list[str]:
+    """Turn the model's citations into real source identifiers.
+
+    Evidence is shown to the writer as ``[1] (source) ...``, so the model tends to
+    cite by the bracket index ("1", "[1]") rather than the source itself — which
+    renders as meaningless "1, 2, 3" sources. Map those indices back to the actual
+    evidence source; pass through anything that is already a known source (or any
+    other string, as a last resort). De-duplicate, preserving order.
+    """
+    by_index = {str(i): e.source for i, e in enumerate(evidence, start=1)}
+    known = {e.source for e in evidence}
+    out: list[str] = []
+    for c in raw:
+        token = c.strip().strip("[]").strip()
+        source = by_index.get(token) if token not in known else c
+        if source is None:
+            source = c  # already a source, or an unrecognized label — keep as-is
+        if source and source not in out:
+            out.append(source)
+    return out
+
+
 class Writer(Subagent):
     role = Role.writer
     name = "writer"
@@ -61,7 +83,8 @@ class Writer(Subagent):
         notes = None if validated else (
             "Critic ceiling reached without a PASS; brief proceeds but is not fully validated."
         )
-        answer = Answer(content=out.content, citations=list(out.citations), validated=validated, notes=notes)
+        citations = _resolve_citations(list(out.citations), evidence)
+        answer = Answer(content=out.content, citations=citations, validated=validated, notes=notes)
         done = subtask.model_copy(update={"status": SubtaskStatus.done, "result": "final brief composed"})
         self.log.info("writer -> final brief (validated=%s, %d citations)", validated, len(answer.citations))
         return done, answer
