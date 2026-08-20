@@ -20,8 +20,10 @@ dependencies = [
     # --- tools ---
     "ddgs>=6.0.0",
     # --- long-term memory (local, free) ---
+    # NB: sentence-transformers lives in the `embeddings` extra, not here — it pulls
+    # torch (~670MB installed), and the default embedder is HashingEmbedder, so the
+    # deployed service never needs it. See the `embeddings` extra below.
     "faiss-cpu>=1.8.0",
-    "sentence-transformers>=3.0.0",
     "numpy>=1.26.0",
     # --- service ---
     "fastapi>=0.111.0",
@@ -38,6 +40,12 @@ dev = [
 viz = [
     # graph rendering (Day 13). draw_mermaid_png can also use the mermaid.ink API.
     "grandalf>=0.8",
+]
+embeddings = [
+    # Real semantic embeddings for long-term memory (SentenceTransformerEmbedder).
+    # Optional: HashingEmbedder is the default and needs no model download. Installing
+    # this pulls torch + transformers (~670MB), which is why the deploy image omits it.
+    "sentence-transformers>=3.0.0",
 ]
 
 [project.scripts]

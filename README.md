@@ -143,7 +143,7 @@ git clone https://github.com/krishivsaini/Maestro.git
 cd Maestro
 uv sync                       # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 62 passed, 1 skipped
+# run the full test suite (offline, no API key) — 64 passed, 1 skipped
 uv run pytest
 
 # see the coordination in the browser
@@ -158,6 +158,40 @@ uv run python scripts/demo_cases.py run crit-01     # watch a forced critic reje
 
 The model id is swappable in `maestro/config.py` (or `MAESTRO_MODEL_ID`); the free tier is
 `gemini-3.5-flash` with `gemini-3.1-flash-lite` as a higher-throughput fallback.
+
+---
+
+## Deploying
+
+The service ships as a container: [`Dockerfile`](Dockerfile) builds it, [`render.yaml`](render.yaml)
+is a one-click [Render](https://render.com) Blueprint for the free tier.
+
+```bash
+# build and run locally, exactly as the host will
+docker build -t maestro .
+docker run --rm -p 8000:8000 -e GOOGLE_API_KEY=... maestro
+# open http://127.0.0.1:8000
+```
+
+**On Render:** push this repo to GitHub, then Dashboard → **New** → **Blueprint** → select the repo.
+Render reads `render.yaml` and prompts for `GOOGLE_API_KEY` (stored encrypted, never committed).
+No credit card required.
+
+The image is **133MB** because it omits the `embeddings` extra — `sentence-transformers` pulls torch
+(~670MB installed), and long-term memory defaults to `HashingEmbedder`, so the deployed service never
+needs it. Install it locally with `uv sync --extra embeddings` if you want real semantic embeddings.
+
+Anything hosting this needs a **long-lived container**, not serverless functions: `POST /run` streams
+SSE for the length of a multi-agent run, which function-style hosts (Vercel, Netlify) cut short.
+
+What the free tier costs you, concretely:
+
+| | |
+|---|---|
+| **512MB RAM / 0.1 CPU** | A measured run peaks at ~187MB, so memory is fine; the thin CPU slows cold start, not runs (the work is I/O-bound on Gemini). |
+| **15-min idle spin-down** | The first visitor after a quiet spell waits ~1 min for the container to wake. Health checks don't keep it up. |
+| **Ephemeral disk** | The trace DB and memory store live in `/tmp` and reset on every restart and deploy — past runs aren't durable. Attach a persistent disk (paid) to keep them. |
+| **Shared quota** | The server key is the free Gemini tier (~1500 req/day) shared by every visitor. The viewer's bring-your-own-key field overrides it per-request — the key is used transiently and never stored or logged. |
 
 ---
 
@@ -178,7 +212,7 @@ The model id is swappable in `maestro/config.py` (or `MAESTRO_MODEL_ID`); the fr
 
 ## Tests
 
-`uv run pytest` → **62 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
+`uv run pytest` → **64 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
 exceeded, dependents wait), `test_critic_loop`, `test_recovery`, `test_loop_control`, plus memory,
 trace-replay, service, and writer-citation tests.

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -71,8 +71,11 @@ class Settings(BaseSettings):
     memory_store_dir: str = "memory_store"
 
     # --- Service ---
+    # Local dev binds loopback; containers set MAESTRO_HOST=0.0.0.0 (see Dockerfile).
     host: str = "127.0.0.1"
-    port: int = 8000
+    # PaaS hosts (Render, Cloud Run, Fly) inject a bare ``PORT`` and expect the process
+    # to bind exactly it, so accept that name alongside the prefixed ``MAESTRO_PORT``.
+    port: int = Field(default=8000, validation_alias=AliasChoices("MAESTRO_PORT", "PORT"))
 
 
 @lru_cache

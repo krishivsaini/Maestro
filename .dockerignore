@@ -1,0 +1,45 @@
+# The build only needs pyproject.toml, uv.lock, maestro/ and viewer/.
+# Everything below either bloats the image or must never reach it.
+
+# Secrets — never bake a key into a layer (Render injects it as an env var).
+.env
+.env.*
+!.env.example
+
+# Local virtualenv (~893MB) — the image builds its own.
+.venv/
+venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local runtime artifacts — the container starts with a clean store.
+*.db
+*.sqlite
+*.sqlite3
+memory_store/
+runs/
+*.log
+
+# Not needed at runtime
+.git/
+.github/
+tests/
+docs/
+scripts/
+conftest.py
+*.md
+!README.md
+graph.png
+graph.mmd
+data/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,46 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploys the Maestro service (FastAPI + coordination viewer) as a Docker web
+# service on Render's free tier. Create it via Dashboard -> New -> Blueprint,
+# pointed at this repo; Render prompts for GOOGLE_API_KEY during setup.
+#
+# Free-tier characteristics worth knowing before you demo this:
+#   - 512MB RAM / 0.1 CPU. The image omits torch specifically to fit.
+#   - Spins down after 15 minutes with no inbound traffic; the next request
+#     takes ~1 minute to wake it. Health checks do not keep it awake.
+#   - Disk is ephemeral: the trace DB and memory store reset on every restart
+#     and deploy. Past runs are not durable here (see MAESTRO_TRACE_DB_PATH).
+#   - 750 instance hours per workspace per month; no credit card required.
+
+services:
+  - type: web
+    name: maestro
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # Prompted for at Blueprint creation, then stored encrypted. Never commit
+      # the key — visitors can also paste their own in the viewer (bring-your-own-key),
+      # which takes precedence per-request and is never stored or logged.
+      - key: GOOGLE_API_KEY
+        sync: false
+
+      # Bind all interfaces so Render's proxy can reach the process. Render injects
+      # PORT itself; config.Settings.port reads that bare name directly.
+      - key: MAESTRO_HOST
+        value: 0.0.0.0
+
+      # Ephemeral disk — keep runtime state off the read-only-ish app dir and in
+      # a path that is unambiguously writable for the non-root container user.
+      - key: MAESTRO_TRACE_DB_PATH
+        value: /tmp/maestro_runs.db
+      - key: MAESTRO_MEMORY_STORE_DIR
+        value: /tmp/memory_store
+
+      # Gemini free tier is ~10 RPM on the primary model, and a multi-agent run
+      # multiplies calls, so keep the parallel burst small (see maestro/config.py).
+      - key: MAESTRO_MAX_PARALLEL
+        value: "2"
