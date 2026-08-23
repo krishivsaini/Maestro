@@ -758,35 +758,67 @@ async function replay(runId) {
 // waits ~1 minute for the container to boot. Say so plainly — an unexplained stall
 // reads as broken, an explained one reads as a free tier doing what free tiers do.
 let awake = false;
-async function ping(ms) {
+// Tri-state on purpose. Static hosts (Cloudflare Pages, Netlify) serve index.html
+// with a 200 for unknown paths, so a bare `response.ok` reports a healthy backend
+// when there is no backend at all — and the failure then surfaces as a Conduct
+// button that streams HTML and does nothing. Require the real health payload, and
+// separate "nothing answered" (worth waiting out) from "something answered but it
+// is not Maestro" (a misconfiguration no amount of waiting fixes).
+//   -> "ok" | "down" | "wrong"
+async function probe(ms) {
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), ms);
-  try { return (await fetch(api("/healthz"), { signal: ctl.signal, cache: "no-store" })).ok; }
-  catch (_) { return false; }
+  try {
+    const r = await fetch(api("/healthz"), { signal: ctl.signal, cache: "no-store" });
+    if (!r.ok) return "down";
+    const body = await r.json().catch(() => null);
+    return body && body.status === "ok" ? "ok" : "wrong";
+  } catch (_) { return "down"; }
   finally { clearTimeout(to); }
 }
+// Names the origin actually being called, so a misconfigured deployment says which
+// address it tried instead of just "not responding".
+function apiOrigin() { return API || location.origin; }
+function showMisconfigured(box) {
+  box.classList.remove("ready"); box.classList.add("show");
+  $("waking-text").innerHTML = `<b>no Maestro API at ${esc(apiOrigin())}</b>`;
+  $("waking-note").textContent = API
+    ? "that origin answered, but it is not the Maestro API"
+    : "set window.MAESTRO_API in config.js to the backend's origin";
+}
+
 async function wake() {
   if (awake) return true;
-  if (await ping(2500)) { awake = true; return true; }   // warm: no banner at all
-  const box = $("waking"), t0 = Date.now();
+  const box = $("waking");
+  const first = await probe(2500);
+  if (first === "ok") { awake = true; return true; }      // warm: no banner at all
+  if (first === "wrong") { showMisconfigured(box); return false; }  // waiting won't help
+
+  const t0 = Date.now();
   box.classList.remove("ready"); box.classList.add("show");
   $("run").disabled = true;
   const tick = setInterval(() => {
     $("waking-secs").textContent = Math.round((Date.now() - t0) / 1000) + "s";
   }, 500);
+  let wrong = false;
   try {
     for (let i = 0; i < 90; i++) {            // ~4 minute ceiling, then give up honestly
-      if (await ping(5000)) { awake = true; break; }
+      const s = await probe(5000);
+      if (s === "ok") { awake = true; break; }
+      if (s === "wrong") { wrong = true; break; }
       await new Promise((r) => setTimeout(r, 1200));
     }
   } finally { clearInterval(tick); $("run").disabled = false; }
+
   if (awake) {
     box.classList.add("ready");
     $("waking-text").innerHTML = `ready in <b>${Math.round((Date.now() - t0) / 1000)}s</b>`;
     $("waking-note").textContent = "";
     setTimeout(() => box.classList.remove("show"), 2600);
+  } else if (wrong) {
+    showMisconfigured(box);
   } else {
-    $("waking-text").innerHTML = `<b>the backend is not responding</b>`;
-    $("waking-note").textContent = "try reloading in a moment";
+    $("waking-text").innerHTML = `<b>no response from ${esc(apiOrigin())}</b>`;
+    $("waking-note").textContent = "the backend may still be starting — try reloading";
   }
   return awake;
 }
