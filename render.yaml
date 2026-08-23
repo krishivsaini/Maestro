@@ -44,3 +44,10 @@ services:
       # multiplies calls, so keep the parallel burst small (see maestro/config.py).
       - key: MAESTRO_MAX_PARALLEL
         value: "2"
+
+      # Origin of the separately-hosted viewer, e.g. https://maestro.pages.dev.
+      # Left empty CORS stays off entirely, which is correct while this service is
+      # also serving the viewer at "/". Fill it in from the Render dashboard once
+      # the static frontend exists — you cannot know its URL before deploying it.
+      - key: MAESTRO_CORS_ORIGINS
+        value: ""

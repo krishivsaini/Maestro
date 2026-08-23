@@ -36,10 +36,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Non-root. Owns /app because the trace DB and memory store are written there.
 RUN useradd --create-home --uid 10001 maestro
 
 WORKDIR /app
+
+# WORKDIR creates /app as root, and COPY --chown only covers what it copies — so the
+# non-root user could not create the trace DB in the working dir. Give runtime state
+# its own owned directory and point the defaults at it, so `docker run` needs no env.
+RUN mkdir -p /app/data && chown -R maestro:maestro /app
 
 COPY --from=builder --chown=maestro:maestro /app/.venv /app/.venv
 COPY --chown=maestro:maestro maestro/ ./maestro/
@@ -51,7 +55,10 @@ ENV PATH="/app/.venv/bin:$PATH" \
     # Bind all interfaces — loopback is unreachable from the host's proxy.
     MAESTRO_HOST=0.0.0.0 \
     # Fallback only; the platform's injected PORT wins (see config.Settings.port).
-    PORT=8000
+    PORT=8000 \
+    # Writable by the non-root user. Ephemeral unless a volume is mounted here.
+    MAESTRO_TRACE_DB_PATH=/app/data/maestro_runs.db \
+    MAESTRO_MEMORY_STORE_DIR=/app/data/memory_store
 
 USER maestro
 

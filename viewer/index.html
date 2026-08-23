@@ -93,6 +93,22 @@
   .keynote a { color: var(--v-researcher); }
   #keymsg { font-family: var(--font-mono); font-size: 11.5px; color: var(--amber); }
 
+  /* ---- waking the backend (free-tier cold start) ---- */
+  .waking { display: none; align-items: center; gap: 11px; margin-top: 16px; padding: 11px 15px;
+    border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 4px;
+    background: var(--stage-2); flex-wrap: wrap; }
+  .waking.show { display: flex; }
+  .waking.ready { border-left-color: var(--green); }
+  .waking .pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--amber);
+    flex: none; animation: breathe 1.5s ease-in-out infinite; }
+  .waking.ready .pulse { background: var(--green); animation: none; }
+  @keyframes breathe { 0%,100% { opacity: .35; } 50% { opacity: 1; box-shadow: 0 0 9px var(--amber); } }
+  .waking .wt { font-family: var(--font-mono); font-size: 13px; color: var(--ivory); }
+  .waking .wt b { color: var(--amber); font-weight: 600; }
+  .waking.ready .wt b { color: var(--green); }
+  .waking .wn { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); margin-left: auto; }
+  @media (prefers-reduced-motion: reduce) { .waking .pulse { animation: none; opacity: 1; } }
+
   /* ---- tempo / dynamics readout ---- */
   .tempo { display: none; gap: 26px; flex-wrap: wrap; margin: 24px 2px 6px; }
   .tempo.show { display: flex; }
@@ -101,8 +117,11 @@
   .tempo .m small { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
 
   /* ---- the score ---- */
-  .score-title { display: flex; align-items: baseline; gap: 12px; margin: 26px 2px 12px; }
-  .score-title h2 { font-family: var(--font-display); font-weight: 400; font-size: 27px; margin: 0; }
+  /* wrap, and keep the title itself unbreakable — the mono hint beside it is long
+     enough to squeeze "The score" onto two lines at narrow widths otherwise. */
+  .score-title { display: flex; align-items: baseline; gap: 12px; margin: 26px 2px 12px; flex-wrap: wrap; }
+  .score-title h2 { font-family: var(--font-display); font-weight: 400; font-size: 27px; margin: 0;
+    flex: none; white-space: nowrap; }
   .score-title span { color: var(--muted); font-size: 12px; font-family: var(--font-mono); letter-spacing: 1px; }
 
   .score {
@@ -111,7 +130,19 @@
       linear-gradient(180deg, rgba(255,255,255,.012), transparent 40%), var(--stage-2);
     overflow: hidden; min-height: 300px;
   }
-  .gutter { position: relative; z-index: 3; border-right: 1px solid var(--line); background: var(--stage-2); }
+  /* All three share row 1 so they stack; the ensemble is a real grid item rather
+     than an absolute overlay, so its text contributes height instead of being
+     clipped by the 300px min-height on narrow screens. */
+  .gutter { grid-area: 1 / 1; position: relative; z-index: 3; border-right: 1px solid var(--line); background: var(--stage-2); }
+  /* min-width:0 — a grid track defaults to min-content, which a wide canvas would
+     otherwise blow past instead of scrolling inside canvas-wrap. */
+  .canvas-wrap { grid-area: 1 / 2; min-width: 0; }
+
+  /* Right-edge fade: the only cue that the score continues past the viewport. */
+  .score.scrollable::after {
+    content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 60px; z-index: 3;
+    pointer-events: none; background: linear-gradient(90deg, transparent, var(--stage-2) 88%);
+  }
   .gutter .lane-label {
     height: var(--lane-h); padding: 0 12px; display: flex; flex-direction: column; justify-content: center;
     border-bottom: 1px solid rgba(255,255,255,.03); position: relative;
@@ -123,6 +154,9 @@
   .lane-label .rl { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
 
   .canvas-wrap { overflow-x: auto; overflow-y: hidden; position: relative; scroll-behavior: smooth; }
+  .canvas-wrap::-webkit-scrollbar { height: 8px; }
+  .canvas-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  .canvas-wrap::-webkit-scrollbar-thumb:hover { background: var(--muted); }
   .canvas { position: relative; height: 100%; }
   .lane-rule { position: absolute; left: 0; right: 0; height: var(--lane-h);
     border-bottom: 1px solid rgba(255,255,255,.03); }
@@ -145,6 +179,12 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .note .sum { font-family: var(--font-mono); font-size: 11px; line-height: 1.35; color: #d7cebf;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* Fitted down to show a whole run, a note is too narrow for both the id chip and
+     the summary — the chip degrades to "a." and tells you nothing. Drop it and give
+     the width back to the summary, which is the part that carries meaning. */
+  .score.compact .note .chip { display: none; }
+  .score.compact .note .sum { -webkit-line-clamp: 3; }
+  .score.compact .note .lab { font-size: 9px; letter-spacing: 1px; }
   .note.enter { animation: strike .34s cubic-bezier(.2,.8,.2,1); }
   @keyframes strike { from { opacity: 0; transform: translateY(7px) scale(.97); } to { opacity: 1; transform: none; } }
 
@@ -155,7 +195,9 @@
   .arcs text { fill: var(--v-critic); font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 1px; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
 
-  .playhead { position: absolute; top: 0; bottom: 0; width: 2px; z-index: 4; pointer-events: none;
+  /* z-index 1: above the lane rules, below the notes (2) — it marks time behind the
+     score rather than drawing a line through the note text. */
+  .playhead { position: absolute; top: 0; bottom: 0; width: 2px; z-index: 1; pointer-events: none;
     background: linear-gradient(180deg, transparent, var(--brass) 12%, var(--brass) 88%, transparent);
     box-shadow: 0 0 14px 1px rgba(216,166,63,.5); transition: left .35s cubic-bezier(.3,.7,.3,1); opacity: 0; }
   .playhead.on { opacity: 1; }
@@ -163,8 +205,9 @@
     border-radius: 50%; background: var(--brass); box-shadow: 0 0 12px var(--brass); }
 
   /* ---- ensemble (pre-run) ---- */
-  .ensemble { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 20px; text-align: center; padding: 30px; }
+  .ensemble { grid-area: 1 / 1 / 2 / -1; z-index: 5; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px; text-align: center; padding: 30px;
+    background: var(--stage-2); }
   .ensemble p { color: var(--muted); margin: 0; font-size: 14px; max-width: 460px; }
   .ensemble .players { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
   .player { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; }
@@ -267,6 +310,12 @@
     <span id="keymsg"></span>
   </div>
 
+  <div class="waking" id="waking">
+    <span class="pulse"></span>
+    <span class="wt" id="waking-text">warming the orchestra… <b id="waking-secs">0s</b></span>
+    <span class="wn" id="waking-note">the free tier sleeps after 15 min idle</span>
+  </div>
+
   <div class="tempo" id="tempo">
     <div class="m"><b id="t-status">—</b><small>movement</small></div>
     <div class="m"><b id="t-subtasks">0</b><small>voices</small></div>
@@ -305,7 +354,17 @@
   </div>
 </div>
 
+<!-- Optional: sets window.MAESTRO_API when the viewer is hosted apart from the API.
+     FastAPI serves an empty one at /config.js, so same-origin needs no configuration. -->
+<script src="config.js"></script>
 <script>
+// Backend origin. Empty string = same origin (FastAPI serving this file at /).
+// A static deployment sets window.MAESTRO_API in config.js; ?api=<origin> overrides
+// both, which is how you point a local page at a deployed backend to test.
+const API = (new URLSearchParams(location.search).get("api") || window.MAESTRO_API || "")
+  .replace(/\/+$/, "");
+const api = (path) => API + path;
+
 const EXAMPLES = [
   "Compare solar and wind energy for grid reliability, and recommend one.",
   "Should a startup use PostgreSQL or MongoDB for its first product?",
@@ -337,7 +396,7 @@ function setModel(role) {
 }
 async function loadModels() {
   try {
-    MODELS = await (await fetch("/models")).json();
+    MODELS = await (await fetch(api("/models"))).json();
     currentModel = MODELS.default;
     $("seg-default").textContent = shortModel(MODELS.default);
     $("seg-fallback").textContent = shortModel(MODELS.fallback);
@@ -365,7 +424,11 @@ function toggleKey(force) {
 }
 $("keytoggle").onclick = () => { $("keymsg").textContent = ""; toggleKey(); };
 
-let lanes, laneMap, beat, prevKey, notes, pendingReject, laneCount, silence;
+let lanes, laneMap, beat, prevKey, notes, pendingReject, laneCount, silence, arcPairs;
+// live tallies — the tempo readout used to sit at 0 until the final frame, which
+// made an obviously-busy run look idle. These count as the events arrive; showFinal
+// then overwrites them with the server's authoritative numbers.
+let liveSubtasks, liveCritic, liveRecover;
 const PAD_X = 22, PAD_Y = 10, NOTE_H = 56;
 
 // heartbeat: if the model goes quiet (e.g. rate-limit backoff inside one node),
@@ -378,7 +441,41 @@ function pokeSilence(active) {
     $("t-status").textContent = "backing off…"; $("t-status").style.color = "var(--amber)";
   }, 5000);
 }
-const LANE_H = () => parseInt(cssv("--lane-h")), BEAT_W = () => parseInt(cssv("--beat-w")), NOTE_W = () => parseInt(cssv("--note-w"));
+const LANE_H = () => parseInt(cssv("--lane-h"));
+// Horizontal scale. 1 while playing (full-size notes, the score scrolls to follow the
+// playhead); shrunk on finish so the whole performance fits — see fitScore().
+let scale = 1;
+const MIN_SCALE = 0.5;  // below this the summaries stop being readable; scroll instead
+const BASE_BEAT = () => parseInt(cssv("--beat-w")), BASE_NOTE = () => parseInt(cssv("--note-w"));
+const BEAT_W = () => Math.round(BASE_BEAT() * scale), NOTE_W = () => Math.round(BASE_NOTE() * scale);
+
+// Reposition every note for the current scale and redraw the arcs, which are drawn
+// in absolute canvas coordinates and so cannot survive a scale change on their own.
+function relayout() {
+  canvas.style.setProperty("--note-w", NOTE_W() + "px");
+  for (const n of notes) { n.x = PAD_X + n.beat * BEAT_W(); n.el.style.left = n.x + "px"; }
+  arcs.innerHTML = "";
+  for (const [from, to] of arcPairs) drawArc(from, to, true);
+  extendCanvas();
+  const px = PAD_X + beat * BEAT_W() + NOTE_W() / 2;
+  playhead.style.left = px + "px";
+}
+
+// On finish, scale the score down until the entire run is visible at once. Without
+// this the canvas stays parked at the playhead and the finished view shows empty
+// researcher lanes — hiding the parallelism that is the whole point of the run.
+function fitScore() {
+  if (!notes.length) return;
+  const avail = cwrap.clientWidth - PAD_X * 2;
+  // Match extendCanvas()'s width exactly — it reserves a full beat past the last
+  // note, so sizing against the notes alone leaves the score fractionally scrollable
+  // even when it looked like it should fit.
+  const needed = (beat + 1) * BASE_BEAT() + Math.max(0, BASE_NOTE() - BASE_BEAT());
+  scale = Math.max(MIN_SCALE, Math.min(1, avail / needed));
+  $("score").classList.toggle("compact", scale < 0.78);
+  relayout();
+  cwrap.scrollLeft = 0;
+}
 
 function voiceFor(kind, agent) {
   if (OVERRIDE[kind]) return cssv(OVERRIDE[kind]);
@@ -427,15 +524,28 @@ function addNote(ev) {
   el.innerHTML = `<div class="top"><span class="dot"></span><span class="lab">${LABEL[kind] || kind}</span>${chip}</div>` +
                  `<div class="sum">${esc(ev.summary || "")}</div>`;
   canvas.appendChild(el);
-  const note = { beat, laneIdx: lane.idx, x, y, kind, agent };
+  const note = { beat, laneIdx: lane.idx, x, y, kind, agent, el };
   notes.push(note);
+  bumpTallies(ev, kind);
 
   // signature: critic REJECT -> next analyst PLAY draws a loop-back arc
   if (kind === "critic_reject") pendingReject = note;
   else if (kind === "subagent_result" && agent === "analyst" && pendingReject) {
+    arcPairs.push([pendingReject, note]);
     drawArc(pendingReject, note); pendingReject = null;
   }
   extendCanvas(); movePlayhead();
+}
+
+// Count what has actually been seen so far, so the readout tracks the performance
+// instead of sitting at zero until it ends.
+function bumpTallies(ev, kind) {
+  if (ev.subtask_id) liveSubtasks.add(ev.subtask_id);
+  if (kind === "critic_pass") liveCritic++;
+  if (kind === "recovery") liveRecover++;
+  $("t-subtasks").textContent = liveSubtasks.size;
+  $("t-critic").textContent = liveCritic;
+  $("t-recover").textContent = liveRecover;
 }
 
 function extendCanvas() {
@@ -443,13 +553,25 @@ function extendCanvas() {
   canvas.style.width = Math.max(w, cwrap.clientWidth) + "px";
   arcs.setAttribute("width", canvas.style.width.replace("px", ""));
   arcs.setAttribute("height", (laneCount * LANE_H()) || 300);
+  markScrollable();
+}
+// The score scrolls horizontally with no built-in cue; fade the right edge and say so
+// in the hint whenever there is more performance than fits.
+function markScrollable() {
+  const more = canvas.scrollWidth - cwrap.clientWidth > 4;
+  $("score").classList.toggle("scrollable", more);
+  // NB: plain arrows only — IBM Plex Mono lacks the fancier arrow glyphs and the
+  // fallback renders something else entirely (U+21C4 came out as "≠").
+  $("score-hint").textContent = more
+    ? "one stave per agent · time flows right · scroll for more →"
+    : "one stave per agent · time flows right · brass = the conductor";
 }
 function movePlayhead() {
   const px = PAD_X + beat * BEAT_W() + NOTE_W() / 2;
   playhead.style.left = px + "px"; playhead.classList.add("on");
   cwrap.scrollLeft = Math.max(0, px - cwrap.clientWidth * 0.62);
 }
-function drawArc(from, to) {
+function drawArc(from, to, instant) {
   const x1 = from.x + NOTE_W(), y1 = from.y + NOTE_H / 2;
   const x2 = to.x, y2 = to.y + NOTE_H / 2;
   const cx = Math.max(x1, x2) + 46, cy = (y1 + y2) / 2;
@@ -458,15 +580,32 @@ function drawArc(from, to) {
   p.setAttribute("d", d);
   const len = Math.hypot(cx - x1, 0) + Math.abs(y2 - y1) + Math.hypot(x2 - cx, 0) + 40;
   p.style.setProperty("--len", len);
+  // A redraw (rescale) must not replay the draw-on animation — the arc is already
+  // part of the score by then and re-animating reads as a second rejection. The
+  // dashoffset must be cleared too: without the animation it would stay at --len,
+  // leaving the arc fully dashed out and invisible.
+  if (instant) { p.style.animation = "none"; p.style.strokeDashoffset = "0"; }
   const head = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   head.setAttribute("cx", x2); head.setAttribute("cy", y2); head.setAttribute("r", 3.5); head.setAttribute("class", "cap");
-  const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  t.setAttribute("x", cx + 6); t.setAttribute("y", cy + 3); t.textContent = "sent back";
-  arcs.appendChild(p); arcs.appendChild(head); arcs.appendChild(t);
+  arcs.appendChild(p); arcs.appendChild(head);
+  // The label only earns its place if it fits in the gap between the two notes. The
+  // arcs layer sits below the notes, so a label drawn into occupied space is not
+  // clipped but buried — it surfaces as a stray fragment ("…ack") beside the note.
+  const gap = Math.abs(x2 - x1);
+  if (gap > 74) {
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.setAttribute("x", (x1 + x2) / 2); t.setAttribute("y", cy + 3);
+    t.setAttribute("text-anchor", "middle");
+    t.textContent = "sent back";
+    arcs.appendChild(t);
+  }
 }
 
 function resetScore() {
   lanes = []; laneMap = {}; beat = 0; prevKey = null; notes = []; pendingReject = null; laneCount = 0;
+  arcPairs = []; liveSubtasks = new Set(); liveCritic = 0; liveRecover = 0;
+  scale = 1; canvas.style.removeProperty("--note-w");
+  $("score").classList.remove("scrollable", "compact");
   gutter.innerHTML = "";
   [...canvas.querySelectorAll(".note, .lane-rule")].forEach((n) => n.remove());
   arcs.innerHTML = ""; canvas.style.width = ""; canvas.style.height = "";
@@ -518,6 +657,7 @@ function mdToHtml(src) {
 
 function showFinal(f) {
   pokeSilence(false);
+  fitScore();  // show the whole performance, not just wherever the playhead stopped
   $("tempo").classList.add("show");
   const st = f.status || "—";
   $("t-status").textContent = st;
@@ -555,6 +695,8 @@ function showFinal(f) {
 async function conduct() {
   const goal = $("goal").value.trim();
   if (!goal) { $("goal").focus(); return; }
+  if (!(await wake())) return;                    // cold backend: warm it before streaming
+  if (!MODELS.default) await loadModels();        // so keyRequired reflects the server
   const thread_id = $("threadin").value.trim() || null;
   const api_key = $("keyin").value.trim() || null;
   if (keyRequired && !api_key) {
@@ -562,7 +704,7 @@ async function conduct() {
   }
   $("run").disabled = true; resetScore();
   try {
-    const resp = await fetch("/run", { method: "POST", headers: { "Content-Type": "application/json" },
+    const resp = await fetch(api("/run"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goal, thread_id, model: currentModel, api_key }) });
     if (!resp.ok || !resp.body) throw new Error("HTTP " + resp.status);
     const reader = resp.body.getReader(), dec = new TextDecoder();
@@ -590,7 +732,7 @@ async function conduct() {
 
 async function loadRuns() {
   try {
-    const r = await fetch("/runs"); const { runs } = await r.json();
+    const r = await fetch(api("/runs")); const { runs } = await r.json();
     const list = $("runlist");
     if (!runs || !runs.length) { list.innerHTML = '<div class="empty">Nothing performed yet.</div>'; return; }
     list.innerHTML = "";
@@ -604,12 +746,60 @@ async function loadRuns() {
   } catch (_) { /* server starting */ }
 }
 async function replay(runId) {
-  const r = await fetch("/runs/" + runId); if (!r.ok) return;
+  const r = await fetch(api("/runs/" + runId)); if (!r.ok) return;
   const rec = await r.json(); resetScore();
   for (const ev of rec.events || []) addNote(ev);
   showFinal(rec);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+
+// --- backend readiness ------------------------------------------------------
+// Free-tier hosts spin the service down after an idle period; the next request then
+// waits ~1 minute for the container to boot. Say so plainly — an unexplained stall
+// reads as broken, an explained one reads as a free tier doing what free tiers do.
+let awake = false;
+async function ping(ms) {
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), ms);
+  try { return (await fetch(api("/healthz"), { signal: ctl.signal, cache: "no-store" })).ok; }
+  catch (_) { return false; }
+  finally { clearTimeout(to); }
+}
+async function wake() {
+  if (awake) return true;
+  if (await ping(2500)) { awake = true; return true; }   // warm: no banner at all
+  const box = $("waking"), t0 = Date.now();
+  box.classList.remove("ready"); box.classList.add("show");
+  $("run").disabled = true;
+  const tick = setInterval(() => {
+    $("waking-secs").textContent = Math.round((Date.now() - t0) / 1000) + "s";
+  }, 500);
+  try {
+    for (let i = 0; i < 90; i++) {            // ~4 minute ceiling, then give up honestly
+      if (await ping(5000)) { awake = true; break; }
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+  } finally { clearInterval(tick); $("run").disabled = false; }
+  if (awake) {
+    box.classList.add("ready");
+    $("waking-text").innerHTML = `ready in <b>${Math.round((Date.now() - t0) / 1000)}s</b>`;
+    $("waking-note").textContent = "";
+    setTimeout(() => box.classList.remove("show"), 2600);
+  } else {
+    $("waking-text").innerHTML = `<b>the backend is not responding</b>`;
+    $("waking-note").textContent = "try reloading in a moment";
+  }
+  return awake;
+}
+async function boot() {
+  if (await wake()) { loadModels(); loadRuns(); }
+}
+
+// A finished score is fitted to the viewport width, so a resize has to re-fit it.
+let refit;
+addEventListener("resize", () => {
+  clearTimeout(refit);
+  refit = setTimeout(() => { if (notes && notes.length && scale < 1) fitScore(); }, 180);
+});
 
 // wire up
 $("run").onclick = conduct;
@@ -629,8 +819,7 @@ for (const [role, sect] of ENSEMBLE) {
   el.innerHTML = `<div class="disc"></div><div class="pn">${role[0].toUpperCase() + role.slice(1)}</div><div class="pr">${sect}</div>`;
   pl.appendChild(el);
 }
-loadModels();
-loadRuns();
+boot();
 </script>
 </body>
 </html>

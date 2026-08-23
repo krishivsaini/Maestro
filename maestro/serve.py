@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from .config import get_settings
@@ -105,6 +106,30 @@ def create_app(
         return graph_cache[target], target
 
     app = FastAPI(title="Maestro", version="0.1.0")
+
+    # Only enabled when the viewer is hosted on a separate origin (see
+    # Settings.cors_origins). Same-origin — FastAPI serving the viewer at "/" —
+    # needs no CORS at all, so the default adds no headers and no OPTIONS handling.
+    origins = settings.cors_origin_list()
+    if origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["Content-Type"],
+        )
+        log.info("CORS enabled for %s", ", ".join(origins))
+
+    @app.get("/config.js")
+    def config_js() -> Response:
+        """Empty stub so the viewer's ``<script src="config.js">`` resolves same-origin.
+
+        A static deployment ships its own ``config.js`` setting ``window.MAESTRO_API``
+        to this service's origin; served from here the viewer is already same-origin,
+        so the value stays empty.
+        """
+        return Response("window.MAESTRO_API = window.MAESTRO_API || '';",
+                        media_type="application/javascript")
 
     @app.get("/models")
     def models() -> dict:

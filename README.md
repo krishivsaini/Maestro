@@ -177,6 +177,29 @@ docker run --rm -p 8000:8000 -e GOOGLE_API_KEY=... maestro
 Render reads `render.yaml` and prompts for `GOOGLE_API_KEY` (stored encrypted, never committed).
 No credit card required.
 
+### Hosting the viewer separately
+
+The viewer is a single static file with no build step, so it can be served from a CDN while the
+API stays on Render. The page then loads instantly even when the backend has spun down, and says
+so plainly instead of hanging:
+
+> ● warming the orchestra… **12s** — the free tier sleeps after 15 min idle
+
+1. Deploy `viewer/` to any static host (Cloudflare Pages, Netlify — both read `viewer/_headers`).
+2. Set the API origin in `viewer/config.js`:
+   ```js
+   window.MAESTRO_API = "https://maestro-xxxx.onrender.com";
+   ```
+3. Point the API back at it — set `MAESTRO_CORS_ORIGINS` to the static host's origin in the Render
+   dashboard. Empty by default, which leaves CORS off; that is correct while FastAPI serves the
+   viewer itself, since same-origin needs no headers.
+
+`?api=<origin>` overrides `config.js`, which is how you point a local copy of the page at a
+deployed backend without editing anything.
+
+None of this is required — FastAPI still serves the viewer at `/`, so the single container remains
+self-contained.
+
 The image is **133MB** because it omits the `embeddings` extra — `sentence-transformers` pulls torch
 (~670MB installed), and long-term memory defaults to `HashingEmbedder`, so the deployed service never
 needs it. Install it locally with `uv sync --extra embeddings` if you want real semantic embeddings.

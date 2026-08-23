@@ -1,0 +1,17 @@
+# Headers for the statically-hosted viewer. Read by Cloudflare Pages and Netlify
+# alike; harmless on hosts that ignore it.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+
+# Holds the backend origin. Must not be cached hard, or repointing the viewer at a
+# different API means waiting out someone's stale copy.
+/config.js
+  Cache-Control: no-cache, must-revalidate
+
+# The app is one file and changes with every deploy — revalidate rather than serve
+# a cached shell that talks to an API contract it no longer matches.
+/index.html
+  Cache-Control: no-cache, must-revalidate

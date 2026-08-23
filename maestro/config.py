@@ -71,11 +71,23 @@ class Settings(BaseSettings):
     memory_store_dir: str = "memory_store"
 
     # --- Service ---
+    # Comma-separated origins allowed to call the API from a browser. Empty (the
+    # default) keeps CORS off entirely, which is correct when FastAPI serves the
+    # viewer itself at ``/`` — same-origin needs no headers. Set this only when the
+    # viewer is deployed to a separate static host, e.g.
+    # ``MAESTRO_CORS_ORIGINS=https://maestro.pages.dev``.
+    cors_origins: str = ""
+
     # Local dev binds loopback; containers set MAESTRO_HOST=0.0.0.0 (see Dockerfile).
     host: str = "127.0.0.1"
     # PaaS hosts (Render, Cloud Run, Fly) inject a bare ``PORT`` and expect the process
     # to bind exactly it, so accept that name alongside the prefixed ``MAESTRO_PORT``.
     port: int = Field(default=8000, validation_alias=AliasChoices("MAESTRO_PORT", "PORT"))
+
+
+    def cors_origin_list(self) -> list[str]:
+        """``cors_origins`` split into a list; empty when CORS should stay off."""
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 @lru_cache
