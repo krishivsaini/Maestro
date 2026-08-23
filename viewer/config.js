@@ -12,4 +12,4 @@
 //
 // A ?api=<origin> query parameter overrides this, for pointing a local copy of the
 // page at a deployed backend without editing anything.
-window.MAESTRO_API = "";
+window.MAESTRO_API = "https://maestro-bb8l.onrender.com";
