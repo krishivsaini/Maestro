@@ -1,6 +1,6 @@
 """Resilience — rate-limit + transient error classification and retry behavior.
 
-Backs the Day 2 backoff layer and the transient-retry improvement (503/network)
+Backs the backoff layer and the transient-retry improvement (503/network)
 found while running the live demo.
 """
 

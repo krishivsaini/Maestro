@@ -1,4 +1,4 @@
-"""The API service (§16) — FastAPI streaming supervisor delegations + subagent progress.
+"""The API service — FastAPI streaming supervisor delegations + subagent progress.
 
 ``POST /run`` streams (SSE) the coordination as it happens: plan produced ->
 subtasks dispatched -> each subagent's result -> critic verdicts -> recovery ->
@@ -6,7 +6,7 @@ final output. ``thread_id`` groups turns and long-term memory. Every completed r
 is persisted to the trace store and reconstructable via ``GET /runs/{run_id}``.
 
 Streaming is what makes a 90-second demo legible instead of opaque — watching the
-supervisor delegate and the critic reject is the whole pitch (§1.2.9).
+supervisor delegate and the critic reject is the whole pitch.
 """
 
 from __future__ import annotations

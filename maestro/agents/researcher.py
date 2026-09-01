@@ -1,4 +1,4 @@
-"""Researcher subagent (§7).
+"""Researcher subagent.
 
 Gathers evidence for ONE assigned sub-question via the tools (web search by
 default, or simple retrieval over a provided corpus for offline runs), then uses
@@ -7,7 +7,7 @@ and its own tool results — never other agents' internals. Produces ``Evidence`
 items tagged with their source and the originating subtask.
 
 Tool failures / empty results are returned as a ``failed`` subtask (no raw raise);
-the supervisor decides what the failure means and how to recover (§13, §15).
+the supervisor decides what the failure means and how to recover.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Day 4 — bounded parallelism + dependency handling (§11, FR-17..FR-20).
+"""Bounded parallelism + dependency handling (FR-17..FR-20).
 
 Proves the three parallelism guarantees:
   (a) independent subtasks actually run concurrently,
@@ -94,7 +94,7 @@ def test_dependent_starts_after_dependencies_finish():
     assert se["write"][0] >= se["critique"][1] - EPS
 
 
-# --- blocked detection (used by Day 8 recovery) -----------------------------
+# --- blocked detection (used by recovery) -----------------------------------
 def test_blocked_subtasks_when_dependency_failed():
     subs = [
         Subtask(id="r1", description="x", role=Role.researcher, status=SubtaskStatus.failed),

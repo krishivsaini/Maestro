@@ -1,4 +1,4 @@
-"""Day 6 — the critic loop (§12, FR-13..FR-16).
+"""The critic loop (FR-13..FR-16).
 
 Proves the disagreement mechanism: a rejected draft is revised and re-reviewed;
 a later PASS ends the loop; and if the ceiling is hit without a PASS, the loop

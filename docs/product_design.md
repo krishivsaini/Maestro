@@ -1,6 +1,6 @@
 # Maestro — Product Design
 
-> **Status:** Draft v1 · Derived from `MAESTRO_BUILD_PLAN.md` (source of truth)
+> **Status:** Draft v1
 > **Scope of this doc:** The *product* — what Maestro is, who it's for, the experience it delivers, the task it performs, and the design principles that keep the "multi-agent" claim honest. Technical structure lives in `architecture.md`; the build order lives in `implementation_plan.md`.
 
 ---

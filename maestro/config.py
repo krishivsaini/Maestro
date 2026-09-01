@@ -42,26 +42,26 @@ class Settings(BaseSettings):
     search_max_results: int = 5
 
     # --- Concurrency & plan bounds ---
-    max_parallel: int = 2  # Gemini free tier ~10 RPM -> keep small (§5)
-    max_subtasks: int = 6  # a good decomposition is tight, not sprawling (§10)
+    max_parallel: int = 2  # Gemini free tier ~10 RPM -> keep small
+    max_subtasks: int = 6  # a good decomposition is tight, not sprawling
 
-    # --- Loop / cost ceilings (§15) ---
+    # --- Loop / cost ceilings ---
     max_steps: int = 40  # global backstop: total node executions per run
     max_critic_iters: int = 3
     max_recovery_attempts: int = 2
     loop_detect_threshold: int = 5  # same delegation dispatched this many times -> loop
 
-    # --- Backoff / rate-limit resilience (tenacity; §15) ---
+    # --- Backoff / rate-limit resilience (tenacity) ---
     backoff_base_seconds: float = 1.0
     backoff_max_seconds: float = 30.0
     backoff_max_attempts: int = 6
     backoff_jitter_seconds: float = 1.0
 
-    # --- Fault injection (makes visible recovery demoable; §13) ---
+    # --- Fault injection (makes visible recovery demoable) ---
     fault_injection: bool = False
     fault_injection_tool: str = "web_search"
 
-    # --- Demo: force the Critic to REJECT its first N reviews (§12, §21.3) ---
+    # --- Demo: force the Critic to REJECT its first N reviews ---
     # A genuine LLM critic can reject on its own; this makes a rejection reliably
     # triggerable on demand for the reject->revise->pass demo. 0 = off.
     force_critic_reject: int = 0

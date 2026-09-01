@@ -1,4 +1,4 @@
-"""Shared subagent scaffolding (§7, §18.1).
+"""Shared subagent scaffolding.
 
 The single most important property here is **separate contexts**: a subagent is
 built from *only* its own system prompt plus a scoped human input that the caller
@@ -47,7 +47,7 @@ class Subagent:
     def _messages(self, human: str) -> list[tuple[str, str]]:
         """A subagent sees ONLY its own system prompt + its scoped human input.
 
-        This is the separate-context guarantee (§18.1): no shared scratchpad, no
+        This is the separate-context guarantee: no shared scratchpad, no
         other agents' internals — only what the caller explicitly scopes in.
         """
         return [("system", self.system_prompt), ("human", human)]

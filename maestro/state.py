@@ -10,7 +10,7 @@ Two layers live here:
    of clobbering each other.
 
 The ``Subtask`` model with its ``depends_on`` list is the spine: it is what makes
-decomposition dynamic (§10) and scheduling dependency-aware (§11).
+decomposition dynamic and scheduling dependency-aware.
 """
 
 from __future__ import annotations
@@ -140,7 +140,7 @@ class MemoryItem(BaseModel):
 
 
 class TraceEvent(BaseModel):
-    """One replayable event. Every meaningful transition appends one (§17)."""
+    """One replayable event. Every meaningful transition appends one."""
 
     event_type: EventType
     agent: str
@@ -207,7 +207,7 @@ class MaestroState(TypedDict, total=False):
     critic_verdicts: Annotated[list[CriticVerdict], append_list]
     memory_hits: list[MemoryItem]
 
-    # counters (loop/cost control, §15)
+    # counters (loop/cost control)
     step_count: int
     critic_iterations: int
     recovery_attempts: int
@@ -216,7 +216,7 @@ class MaestroState(TypedDict, total=False):
     final_output: Optional[Answer]
     status: str  # RunStatus value
 
-    # observability (§17)
+    # observability
     trace: Annotated[list[TraceEvent], append_list]
 
 

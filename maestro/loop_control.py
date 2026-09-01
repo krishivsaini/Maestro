@@ -1,4 +1,4 @@
-"""Loop & cost control (§15) — the safety nets that keep a run bounded.
+"""Loop & cost control — the safety nets that keep a run bounded.
 
 Multi-agent systems loop and multiply cost, so bounding them is a required
 feature, not an afterthought. Three explicit bounds live in the graph's routers:

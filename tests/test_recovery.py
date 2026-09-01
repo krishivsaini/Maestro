@@ -1,4 +1,4 @@
-"""Day 8 — visible recovery from subagent failure (§15, FR-21..FR-24).
+"""Visible recovery from subagent failure (FR-21..FR-24).
 
 Injects a researcher failure and proves the supervisor recovers along an explicit,
 logged path: retry succeeds -> run completes fully; or recovery is exhausted ->

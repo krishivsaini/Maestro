@@ -1,4 +1,4 @@
-"""Day 5 — Researcher + Analyst subagents with separate contexts (§7, §18.1).
+"""Researcher + Analyst subagents with separate contexts.
 
 Uses the StubModel from conftest so the LLM step is deterministic and offline.
 Proves: the researcher turns tool output into sourced evidence; tool failure /
@@ -110,7 +110,7 @@ def test_analyst_passes_feedback_into_context(make_stub):
     assert "claim 2 is unsupported" in captured["human"]  # critic feedback reaches the analyst
 
 
-# --- Separate contexts (§18.1) ---------------------------------------------
+# --- Separate contexts ---------------------------------------------
 def test_agents_have_distinct_prompts():
     assert Researcher().system_prompt != Analyst().system_prompt
     assert Researcher().system_prompt.strip() and Analyst().system_prompt.strip()

@@ -1,4 +1,4 @@
-"""Day 12 — the API service (§16, FR-31..FR-33).
+"""The API service (FR-31..FR-33).
 
 Uses FastAPI's TestClient with stub-modeled agents (offline). Proves /healthz is
 live, /run streams the coordination (plan -> critic reject -> critic pass -> final)

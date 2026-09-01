@@ -1,4 +1,4 @@
-"""Observability — replayable runs (§17).
+"""Observability — replayable runs.
 
 Every meaningful event is already appended to ``state["trace"]`` by the graph
 nodes. This module persists a completed run (SQLite, keyed by run id) so it can be

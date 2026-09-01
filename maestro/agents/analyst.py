@@ -1,9 +1,9 @@
-"""Analyst subagent (§7).
+"""Analyst subagent.
 
 Synthesizes the gathered evidence into a structured analysis/comparison that
 addresses the goal, grounding claims in the evidence. Its context is the goal,
 its analysis task, and the evidence handed to it — not the researchers' raw
-reasoning. The optional ``feedback`` argument is how the critic loop (Day 6)
+reasoning. The optional ``feedback`` argument is how the critic loop
 feeds a rejection back for revision.
 """
 

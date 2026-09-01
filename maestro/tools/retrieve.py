@@ -1,8 +1,8 @@
-"""Simple retrieval tool — DELIBERATELY BASIC (§1.3, §22.7).
+"""Simple retrieval tool — DELIBERATELY BASIC.
 
 This is bag-of-words cosine over a provided corpus. It is *intentionally* not
 production RAG: no embeddings, no hybrid retrieval, no reranking. The signal in
-this project is orchestration, not retrieval quality. Long-term memory (Day 10)
+this project is orchestration, not retrieval quality. Long-term memory
 uses real embeddings; this tool stays simple on purpose.
 """
 

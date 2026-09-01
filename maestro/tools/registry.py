@@ -1,7 +1,7 @@
-"""Tool registry + the structured result type (§13).
+"""Tool registry + the structured result type.
 
 Tools return a ``ToolResult`` (ok / structured failure) and **never raise raw**
-into the graph — the *supervisor* decides what a failure means (§15, §22.9).
+into the graph — the *supervisor* decides what a failure means.
 ``ToolRegistry.run`` is the safety net: even an unexpected exception is converted
 into a structured failure.
 """

@@ -1,6 +1,6 @@
-"""Rate-limit resilience — backoff + jitter around every LLM/tool call (§5, §15).
+"""Rate-limit resilience — backoff + jitter around every LLM/tool call.
 
-Built on Day 2, *before* anything parallelizes, because 429s appear immediately
+Built *before* anything parallelizes, because 429s appear immediately
 under parallel load on the Gemini free tier. Nothing that calls the model or a
 tool should do so without going through here.
 

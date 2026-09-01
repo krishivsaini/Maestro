@@ -1,4 +1,4 @@
-"""Critic subagent + the critic loop (§12) — the vivid "agents disagree" moment.
+"""Critic subagent + the critic loop — the vivid "agents disagree" moment.
 
 The Critic reviews the Analyst's draft AGAINST the gathered evidence and returns a
 structured verdict: PASS, or REJECT + specific feedback. On REJECT the draft goes
@@ -8,7 +8,7 @@ it degrades gracefully (proceed with the best draft, flagged "not fully validate
 never looping unbounded.
 
 A genuine LLM critic can reject on its own. ``force_critic_reject`` (config) makes a
-rejection reliably triggerable on demand for the demo (§21.3) without faking the
+rejection reliably triggerable on demand for the demo without faking the
 whole thing — it only forces the first N reviews to REJECT.
 """
 

@@ -1,4 +1,4 @@
-"""Day 3 — dynamic decomposition (§10, FR-1..FR-4).
+"""Dynamic decomposition (FR-1..FR-4).
 
 Proves the supervisor produces *dynamic* plans: different goals yield different
 valid subtask sets, and malformed plans are rejected. Offline tests use the

@@ -1,4 +1,4 @@
-"""Day 7 — the full LangGraph StateGraph, end-to-end (§9, FR-37).
+"""The full LangGraph StateGraph, end-to-end (FR-37).
 
 Runs the whole supervisor -> research -> analyze <-> critique -> write graph with
 stub-modeled agents (offline, deterministic). Proves: it compiles; the happy path

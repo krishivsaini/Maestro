@@ -1,8 +1,8 @@
-"""Web search tool (keyless DuckDuckGo default) with a fault-injection switch (§13).
+"""Web search tool (keyless DuckDuckGo default) with a fault-injection switch.
 
 The fault-injection switch (``MAESTRO_FAULT_INJECTION=true`` +
 ``MAESTRO_FAULT_INJECTION_TOOL=web_search``) makes this tool return a structured
-failure on demand, which drives the visible-recovery demo (§15). A genuine
+failure on demand, which drives the visible-recovery demo. A genuine
 no-results response is returned as ``ok=True`` but empty, so the supervisor — not
 the tool — decides whether an empty result warrants recovery.
 """

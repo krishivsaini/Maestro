@@ -1,6 +1,6 @@
 # Maestro — Implementation Plan
 
-> **Status:** Draft v1 · Derived from `MAESTRO_BUILD_PLAN.md` (source of truth)
+> **Status:** Draft v1
 > **Scope of this doc:** The *build order* — phases, per-module sequencing, the day-by-day plan, the testing strategy, and risk handling. Requirements live in `requirement.md`; structure in `architecture.md`.
 > **Budget:** 15–17 days × ~3 hours/day, ₹0 on the Gemini free tier.
 
@@ -108,7 +108,7 @@ Tests are the proof the hard parts work — they map 1:1 to the differentiators.
 | Plan silently becomes a fixed pipeline | Medium | High | `test_decomposition.py` requires distinct plans per goal. |
 | Runs spiral in cost/loops | Medium | Medium | `MAX_STEPS` + ceilings + loop detector, tested. |
 | Model ID / limits changed since plan written | Medium | Medium | Live verification Day 1 before hardcoding anything. |
-| Scope creep (5th agent, production RAG, fancy UI) | Medium | Medium | Explicit non-goals; cut order defined (§1.4). |
+| Scope creep (5th agent, production RAG, fancy UI) | Medium | Medium | Explicit non-goals; cut order defined below. |
 
 ---
 

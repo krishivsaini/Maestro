@@ -1,4 +1,4 @@
-"""Writer citation resolution (§7).
+"""Writer citation resolution.
 
 The writer sees evidence as ``[1] (source) ...`` and the model tends to cite by the
 bracket index, which renders as meaningless "1, 2, 3" sources. `_resolve_citations`

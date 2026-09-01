@@ -1,6 +1,6 @@
 # Maestro — Architecture
 
-> **Status:** Draft v1 · Derived from `MAESTRO_BUILD_PLAN.md` (source of truth)
+> **Status:** Draft v1
 > **Scope of this doc:** The *technical structure* — tech stack and rationale, the graph, the state model, concurrency, resilience, memory, and observability. The product intent lives in `product_design.md`; the build order in `implementation_plan.md`.
 > **Note:** This planning doc feeds the eventual repo-root `ARCHITECTURE.md`, which additionally embeds the rendered `graph.png`.
 

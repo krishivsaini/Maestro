@@ -1,4 +1,4 @@
-"""Long-term memory (§14) — a small FAISS vector store over distilled findings.
+"""Long-term memory — a small FAISS vector store over distilled findings.
 
 Persisted across turns of a thread. On completion the graph writes distilled
 findings tagged with the thread id; on a later turn the supervisor queries it
@@ -6,7 +6,7 @@ during planning and results land in ``memory_hits``, informing the analysis.
 
 The **embedder is swappable**: production uses local ``sentence-transformers``
 (free, no API cost); tests/offline use a deterministic hashing embedder so the
-whole thing runs without torch. Retrieval here is deliberately simple (§1.3) —
+whole thing runs without torch. Retrieval here is deliberately simple —
 the signal in this project is orchestration, not retrieval quality.
 """
 

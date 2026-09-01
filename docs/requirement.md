@@ -1,6 +1,6 @@
 # Maestro — Requirements Specification
 
-> **Status:** Draft v1 · Derived from `MAESTRO_BUILD_PLAN.md` (source of truth)
+> **Status:** Draft v1
 > **Project:** Maestro — a supervisor-orchestrated multi-agent system with visible delegation and recovery.
 > **Purpose of this doc:** Enumerate *what* Maestro must do (functional) and *how well* it must do it (non-functional), with traceable acceptance criteria. The build plan holds the narrative rationale; this document holds the checklist a reviewer signs off against.
 
@@ -53,7 +53,7 @@ Each requirement has an ID (`FR-n`), a priority (**MUST** / **SHOULD** / **MAY**
 | ID | Priority | Requirement | Verified by |
 |---|---|---|---|
 | FR-7 | MUST | The system shall implement exactly four specialists: **Researcher, Analyst, Critic, Writer**. No fifth specialist, no swarm. | Code review |
-| FR-8 | MUST | Each specialist shall have its **own system prompt** and its **own working context**; a subagent sees only its assigned task plus relevant structured inputs — never one shared scratchpad. | Code review (§18.1 of plan) |
+| FR-8 | MUST | Each specialist shall have its **own system prompt** and its **own working context**; a subagent sees only its assigned task plus relevant structured inputs — never one shared scratchpad. | Code review |
 | FR-9 | MUST | Subagents shall communicate **through structured state fields and via the supervisor**, not by reading each other's raw context. | Code review |
 | FR-10 | MUST | The Researcher shall gather evidence for its assigned sub-question via search/retrieval and emit `Evidence` items with sources. | `test_graph.py` |
 | FR-11 | MUST | The Analyst shall synthesize relevant evidence into a structured analysis draft whose claims tie to evidence. | `test_graph.py` |
@@ -145,7 +145,7 @@ Each requirement has an ID (`FR-n`), a priority (**MUST** / **SHOULD** / **MAY**
 
 ## 5. Constraints & Assumptions
 
-- **Model:** Gemini Flash on the free tier (primary). Exact model ID and current free-tier RPM/TPM/RPD **must be verified live** before setting `MAX_PARALLEL` and backoff parameters (see `MAESTRO_BUILD_PLAN.md` §5).
+- **Model:** Gemini Flash on the free tier (primary). Exact model ID and current free-tier RPM/TPM/RPD **must be verified live** before setting `MAX_PARALLEL` and backoff parameters.
 - **Framework:** LangGraph. Its parallel/fan-out API (`Send` / conditional parallel edges) **must be verified against the installed version's docs** before implementing `graph.py` / `scheduler.py`.
 - **Rate limits are the real friction:** RPM during parallel bursts, not RPD, is the binding constraint at demo scale. Backoff + concurrency cap solve it.
 - **Single task domain:** research/analysis synthesis, committed on Day 1.

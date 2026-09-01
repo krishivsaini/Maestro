@@ -1,4 +1,4 @@
-"""Day 10 — long-term memory (§14, FR-28..FR-30).
+"""Long-term memory (FR-28..FR-30).
 
 The non-negotiable: long-term memory is written AND read-back-and-used. Proven by
 a two-turn thread where turn 2's analysis provably contains a finding stored in

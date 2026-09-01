@@ -1,4 +1,4 @@
-"""Supervisor — dynamic decomposition (§10) and (later) delegation/completion/recovery.
+"""Supervisor — dynamic decomposition and (later) delegation/completion/recovery.
 
 This is what makes the "orchestrator that breaks down goals" claim true rather
 than cosmetic. The supervisor asks the LLM for a **structured plan** (a Pydantic

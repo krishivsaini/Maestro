@@ -1,4 +1,4 @@
-"""Lightweight evaluation / demo runner over data/eval_cases.jsonl (§19).
+"""Lightweight evaluation / demo runner over data/eval_cases.jsonl.
 
 Deliberately light: the point is to *demonstrate the system behaves* — including
 under failure — not to produce a metrics framework. For each case it records

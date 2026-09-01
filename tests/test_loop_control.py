@@ -1,4 +1,4 @@
-"""Day 9 — loop & cost control (§15, FR-25..FR-27).
+"""Loop & cost control (FR-25..FR-27).
 
 Proves the ceilings halt deliberately runaway runs: the global MAX_STEPS backstop
 halts a spinning critic loop, and the loop detector forces completion when the

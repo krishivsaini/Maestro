@@ -1,17 +1,17 @@
-"""Bounded-parallel, dependency-aware scheduling (§11).
+"""Bounded-parallel, dependency-aware scheduling.
 
 Two layers:
 
 1. **Readiness primitives** — pure functions over a subtask list: which subtasks
    are ready (deps satisfied), the next capped batch, completion/blocked checks.
-   These are reused by the LangGraph routing on Day 7, so the graph and this
+   These are reused by the LangGraph routing, so the graph and this
    standalone executor share one definition of "ready".
 2. **A concrete rolling executor** (``run_schedule``) — runs ready subtasks
    concurrently via a thread pool, **capped at ``MAX_PARALLEL``**, refilling as
    tasks finish, while dependent subtasks wait. It observes actual concurrency so
    the parallelism claim is measurable, and emits per-subtask events for streaming.
 
-The cap is both the parallelism signal *and* the rate-limit protection (§5): with
+The cap is both the parallelism signal *and* the rate-limit protection: with
 the Gemini free tier at ~10 RPM, unbounded fan-out would hit 429s immediately.
 """
 

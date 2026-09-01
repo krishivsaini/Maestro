@@ -1,4 +1,4 @@
-"""The LangGraph StateGraph — the supervisor pattern made explicit (§9, §15).
+"""The LangGraph StateGraph — the supervisor pattern made explicit.
 
 Shape::
 
@@ -17,9 +17,9 @@ Shape::
                                |                           |
                               END                (REJECT & under ceiling) --> analyze
 
-- ``supervisor`` performs dynamic decomposition (§10).
-- ``research`` runs the researcher subtasks with bounded parallelism (§11).
-- ``recover``/``degrade`` implement visible recovery (§15): a failed researcher is
+- ``supervisor`` performs dynamic decomposition.
+- ``research`` runs the researcher subtasks with bounded parallelism.
+- ``recover``/``degrade`` implement visible recovery: a failed researcher is
   retried (bounded by ``MAX_RECOVERY_ATTEMPTS``); if recovery is exhausted the
   subtask is degraded and the run proceeds with partial evidence, flagged in the
   output. Every recovery decision is a logged trace transition.
@@ -140,7 +140,7 @@ def build_graph(
             "step_count": state.get("step_count", 0) + 1,
             "status": RunStatus.running.value,
         }
-        # long-term memory recall (§14): inform this run with prior findings
+        # long-term memory recall: inform this run with prior findings
         if ag.memory is not None:
             hits = ag.memory.query(state["thread_id"], state["goal"], k=3)
             if hits:
@@ -294,7 +294,7 @@ def build_graph(
         elif not critic_passed:
             events.append(_ev(EventType.degraded, "supervisor", "critic ceiling reached; not fully validated"))
 
-        # long-term memory write (§14): persist distilled findings for later turns
+        # long-term memory write: persist distilled findings for later turns
         if ag.memory is not None:
             findings = distill_findings(state.get("analysis"), answer)
             for finding in findings:

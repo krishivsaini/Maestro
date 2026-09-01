@@ -1,4 +1,4 @@
-"""Writer subagent (§7).
+"""Writer subagent.
 
 Composes the final cited brief from the PASSED analysis draft and the evidence.
 Its context is the goal, the analysis, and the evidence — not the researchers' or

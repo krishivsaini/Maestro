@@ -1,4 +1,4 @@
-"""Day 11 — replayable run traces (§17, FR-35..FR-36).
+"""Replayable run traces (FR-35..FR-36).
 
 A completed run is persisted and can be reconstructed after the fact: metadata,
 final output, and the ordered event stream (which subtasks ran, where the critic
