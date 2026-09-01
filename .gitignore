@@ -34,3 +34,6 @@ build/
 .DS_Store
 .idea/
 .vscode/
+
+# Personal build plan — kept locally, deliberately not published.
+MAESTRO_BUILD_PLAN.md
