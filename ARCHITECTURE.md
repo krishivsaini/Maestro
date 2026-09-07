@@ -191,7 +191,7 @@ All tunables in one place, env-overridable with the `MAESTRO_` prefix:
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `model_id` | `gemini-3.6-flash` | Gemini model (verified live; `gemini-3.5-flash-lite` is the fallback, on its own daily quota) |
+| `model_id` | `gemini-3.5-flash-lite` | Gemini model (verified live; `gemini-3.6-flash` is the fuller alternative, on its own daily quota) |
 | `embedding_model` | `BAAI/bge-small-en-v1.5` | local, free long-term-memory embeddings |
 | `max_parallel` | 2 | concurrency cap (rate-limit guard) |
 | `max_subtasks` | 6 | plan-size bound |

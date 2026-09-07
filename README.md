@@ -157,9 +157,10 @@ uv run python scripts/demo_cases.py run crit-01     # watch a forced critic reje
 ```
 
 The model id is swappable in `maestro/config.py` (or `MAESTRO_MODEL_ID`); the free tier is
-`gemini-3.6-flash` with `gemini-3.5-flash-lite` as a higher-throughput fallback. The free tier
-meters requests per model per day, so the fallback is a genuinely separate budget, switchable from
-the viewer mid-run.
+`gemini-3.5-flash-lite` with `gemini-3.6-flash` as the fuller-model alternative. The free tier meters
+requests per model per day, so the alternative is a genuinely separate budget, switchable from the
+viewer mid-run. The lite model leads because a shared public demo exhausts the full-size Flash quota
+first, and it finishes a run in ~40s rather than minutes.
 
 ---
 

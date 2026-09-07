@@ -4,11 +4,18 @@ All settings are overridable via environment variables with the ``MAESTRO_`` pre
 (e.g. ``MAESTRO_MAX_PARALLEL=3``), except the two provider keys which use their
 conventional names (``GOOGLE_API_KEY``, ``SEARCH_API_KEY``).
 
-Model note (verified live 2026-08 against the Gemini API): ``gemini-3.6-flash`` is
-the primary and ``gemini-3.5-flash-lite`` the higher-throughput fallback. Both were
-picked by repeated structured-output planning calls — the demand the planner actually
-places on them — rather than a single trial: each passed 3/3, while the newer
+Model note (verified live 2026-08 against the Gemini API): ``gemini-3.5-flash-lite``
+is the primary and ``gemini-3.6-flash`` the fuller-model alternative. Both were picked
+by repeated structured-output planning calls — the demand the planner actually places
+on them — rather than a single trial: each passed 3/3, while the newer
 ``gemini-3.7-flash`` failed 2/3 with 503 UNAVAILABLE.
+
+A lite model leads deliberately. The free tier meters requests **per model per day**,
+and the full-size Flash quota is the one a shared public demo burns through first; the
+lite quota is far roomier. It is also much faster end-to-end — a measured deployed run
+completes in ~40s against 4+ minutes — which matters more for a live demo than the
+marginal prose quality of the brief. Switch to the fuller model from the viewer, or
+bring your own key, when quality matters more than latency.
 
 The free tier meters requests **per model per day**, so one model's daily quota can
 run dry while another is untouched — that is what the fallback is for, and why the
@@ -40,8 +47,8 @@ class Settings(BaseSettings):
 
     # --- Provider / model (verify live before demo; see module docstring) ---
     google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
-    model_id: str = "gemini-3.6-flash"
-    fallback_model_id: str = "gemini-3.5-flash-lite"  # faster, separate daily quota
+    model_id: str = "gemini-3.5-flash-lite"
+    fallback_model_id: str = "gemini-3.6-flash"  # fuller model, separate daily quota
     embedding_model: str = "BAAI/bge-small-en-v1.5"  # local, free (sentence-transformers)
     temperature: float = 0.2
 
