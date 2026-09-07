@@ -4,12 +4,18 @@ All settings are overridable via environment variables with the ``MAESTRO_`` pre
 (e.g. ``MAESTRO_MAX_PARALLEL=3``), except the two provider keys which use their
 conventional names (``GOOGLE_API_KEY``, ``SEARCH_API_KEY``).
 
-Rate-limit note (verified live 2026-07 against ai.google.dev): the current stable
-free-tier Flash model is ``gemini-3.5-flash`` (~10 RPM / 250K TPM / 1500 RPD).
-A multi-agent run multiplies calls, and RPM during parallel bursts is the binding
-constraint, so ``max_parallel`` defaults to 2 and every call is backoff-wrapped
-(see maestro/resilience.py). ``gemini-3.1-flash-lite`` (~30 RPM) is the
-higher-concurrency fallback.
+Model note (verified live 2026-08 against the Gemini API): ``gemini-3.7-flash`` is
+the primary and ``gemini-3.5-flash-lite`` the higher-throughput fallback. Both were
+checked end-to-end with a real structured-output planning call, which is the demand
+the planner actually places on them.
+
+The free tier meters requests **per model per day**, so one model's daily quota can
+run dry while another is untouched — that is what the fallback is for, and why the
+viewer can switch models mid-demo. A multi-agent run multiplies calls, so
+``max_parallel`` stays small and every call is backoff-wrapped (see resilience.py).
+
+Pinned ids on purpose: the ``gemini-flash-latest`` alias tracks the newest model,
+which is routinely the most overloaded (it returned 503 UNAVAILABLE when checked).
 """
 
 from __future__ import annotations
@@ -31,8 +37,8 @@ class Settings(BaseSettings):
 
     # --- Provider / model (verify live before demo; see module docstring) ---
     google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
-    model_id: str = "gemini-3.5-flash"
-    fallback_model_id: str = "gemini-3.1-flash-lite"  # ~30 RPM, higher concurrency
+    model_id: str = "gemini-3.7-flash"
+    fallback_model_id: str = "gemini-3.5-flash-lite"  # faster, separate daily quota
     embedding_model: str = "BAAI/bge-small-en-v1.5"  # local, free (sentence-transformers)
     temperature: float = 0.2
 

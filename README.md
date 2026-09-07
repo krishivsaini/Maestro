@@ -157,7 +157,9 @@ uv run python scripts/demo_cases.py run crit-01     # watch a forced critic reje
 ```
 
 The model id is swappable in `maestro/config.py` (or `MAESTRO_MODEL_ID`); the free tier is
-`gemini-3.5-flash` with `gemini-3.1-flash-lite` as a higher-throughput fallback.
+`gemini-3.7-flash` with `gemini-3.5-flash-lite` as a higher-throughput fallback. The free tier
+meters requests per model per day, so the fallback is a genuinely separate budget, switchable from
+the viewer mid-run.
 
 ---
 
