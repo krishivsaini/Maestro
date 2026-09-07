@@ -4,18 +4,21 @@ All settings are overridable via environment variables with the ``MAESTRO_`` pre
 (e.g. ``MAESTRO_MAX_PARALLEL=3``), except the two provider keys which use their
 conventional names (``GOOGLE_API_KEY``, ``SEARCH_API_KEY``).
 
-Model note (verified live 2026-08 against the Gemini API): ``gemini-3.7-flash`` is
+Model note (verified live 2026-08 against the Gemini API): ``gemini-3.6-flash`` is
 the primary and ``gemini-3.5-flash-lite`` the higher-throughput fallback. Both were
-checked end-to-end with a real structured-output planning call, which is the demand
-the planner actually places on them.
+picked by repeated structured-output planning calls — the demand the planner actually
+places on them — rather than a single trial: each passed 3/3, while the newer
+``gemini-3.7-flash`` failed 2/3 with 503 UNAVAILABLE.
 
 The free tier meters requests **per model per day**, so one model's daily quota can
 run dry while another is untouched — that is what the fallback is for, and why the
 viewer can switch models mid-demo. A multi-agent run multiplies calls, so
 ``max_parallel`` stays small and every call is backoff-wrapped (see resilience.py).
 
-Pinned ids on purpose: the ``gemini-flash-latest`` alias tracks the newest model,
-which is routinely the most overloaded (it returned 503 UNAVAILABLE when checked).
+Newest is not safest here: model overload tracks demand, so the freshest ids are the
+flakiest. ``gemini-3.8-flash`` and the ``gemini-flash-latest`` alias (which follows the
+newest model) both returned 503 UNAVAILABLE outright, and 3.7 was intermittent. Ids stay
+pinned so the alias cannot silently move the demo onto whatever just shipped.
 """
 
 from __future__ import annotations
@@ -37,7 +40,7 @@ class Settings(BaseSettings):
 
     # --- Provider / model (verify live before demo; see module docstring) ---
     google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
-    model_id: str = "gemini-3.7-flash"
+    model_id: str = "gemini-3.6-flash"
     fallback_model_id: str = "gemini-3.5-flash-lite"  # faster, separate daily quota
     embedding_model: str = "BAAI/bge-small-en-v1.5"  # local, free (sentence-transformers)
     temperature: float = 0.2
