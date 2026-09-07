@@ -35,4 +35,8 @@ def get_chat_model(
         model=model_id or cfg.model_id,
         temperature=cfg.temperature if temperature is None else temperature,
         google_api_key=cfg.google_api_key,
+        # Both are load-bearing; see Settings.llm_timeout_seconds. Without the
+        # timeout a stalled request hangs the run forever with nothing surfaced.
+        timeout=cfg.llm_timeout_seconds,
+        max_retries=cfg.llm_max_retries,
     )

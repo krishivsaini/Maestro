@@ -51,6 +51,15 @@ class Settings(BaseSettings):
     max_recovery_attempts: int = 2
     loop_detect_threshold: int = 5  # same delegation dispatched this many times -> loop
 
+    # --- LLM request bounds ---
+    # A request with no timeout can stall forever; tenacity below only retries calls
+    # that *return*, so an un-timed-out hang never reaches the backoff ladder and the
+    # run stops dead with no error to show. Bound the call so a stall becomes a
+    # retryable exception. max_retries=0 leaves retrying to resilience.py — the
+    # provider client retries internally too, and stacking them multiplies attempts.
+    llm_timeout_seconds: float = 60.0
+    llm_max_retries: int = 0
+
     # --- Backoff / rate-limit resilience (tenacity) ---
     backoff_base_seconds: float = 1.0
     backoff_max_seconds: float = 30.0
