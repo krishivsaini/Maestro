@@ -46,7 +46,15 @@ class Settings(BaseSettings):
     )
 
     # --- Provider / model (verify live before demo; see module docstring) ---
+    # Any model id may carry a ``provider:`` prefix (``groq:llama-3.3-70b``) which wins
+    # over this default, so one process can address several providers — that is what the
+    # benchmark harness and any cross-provider fallback rely on.
+    llm_provider: str = "google"  # google | groq | nvidia
     google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
+    groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
+    nvidia_api_key: str = Field(default="", alias="NVIDIA_API_KEY")
+    # NVIDIA NIM speaks the OpenAI wire format, so it needs no SDK of its own.
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
     model_id: str = "gemini-3.5-flash-lite"
     fallback_model_id: str = "gemini-3.6-flash"  # fuller model, separate daily quota
     embedding_model: str = "BAAI/bge-small-en-v1.5"  # local, free (sentence-transformers)

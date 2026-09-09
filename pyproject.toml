@@ -41,6 +41,13 @@ viz = [
     # graph rendering (Day 13). draw_mermaid_png can also use the mermaid.ink API.
     "grandalf>=0.8",
 ]
+providers = [
+    # Alternative LLM providers behind the maestro/llm.py seam. Kept out of the base
+    # install so the deploy image stays small when only Gemini is used. NVIDIA NIM is
+    # OpenAI-compatible, so langchain-openai covers it with no NVIDIA-specific SDK.
+    "langchain-groq>=0.2.0",
+    "langchain-openai>=0.2.0",
+]
 embeddings = [
     # Real semantic embeddings for long-term memory (SentenceTransformerEmbedder).
     # Optional: HashingEmbedder is the default and needs no model download. Installing

@@ -12,6 +12,8 @@ supervisor delegate and the critic reject is the whole pitch.
 from __future__ import annotations
 
 import json
+import queue
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -76,34 +78,29 @@ def create_app(
     elif agents.memory is None:
         agents.memory = LongTermMemory(embedder=HashingEmbedder())
     store = trace_store if trace_store is not None else TraceStore(settings.trace_db_path)
-    default_graph = build_graph(agents=agents, settings=settings)
 
-    # A run can pick the primary or the higher-throughput fallback model from the UI
-    # (e.g. when the primary hits its free-tier quota). Graphs are built per model on
-    # first use and cached; every model shares the one long-term memory.
+    # A run can pick the primary or the higher-throughput alternative from the UI
+    # (e.g. when the primary hits its free-tier daily quota). Every graph shares the
+    # one long-term memory.
     allowed_models = {settings.model_id, settings.fallback_model_id}
-    graph_cache = {settings.model_id: default_graph}
 
-    def _alt_graph(cfg):
+    def graph_for(model_id: Optional[str], api_key: Optional[str] = None, *, event_sink=None):
+        """Build this request's graph, wired to its own live event sink.
+
+        Built per request rather than cached: the sink is per-run, and compiling the
+        graph measures ~5ms, which is far below the cost of a single model call. A
+        bring-your-own key is used transiently here and never stored or logged.
+        """
+        if injected:  # stub agents (tests) don't use a real model/key
+            return build_graph(agents=agents, settings=settings, event_sink=event_sink), settings.model_id
+        target = model_id if model_id in allowed_models else settings.model_id
+        update = {"model_id": target}
+        if api_key:
+            update["google_api_key"] = api_key
+        cfg = settings.model_copy(update=update)
         alt = build_default_agents(cfg)
         alt.memory = agents.memory  # every graph shares the one long-term memory
-        return build_graph(agents=alt, settings=cfg)
-
-    def graph_for(model_id: Optional[str], api_key: Optional[str] = None):
-        if injected:  # stub agents (tests) don't use a real model/key
-            return default_graph, settings.model_id
-        target = model_id if model_id in allowed_models else settings.model_id
-        if api_key:
-            # bring-your-own-key: build an ephemeral graph, never cached (the key is a
-            # secret) and never logged. It vanishes when this request's graph is GC'd.
-            cfg = settings.model_copy(update={"model_id": target, "google_api_key": api_key})
-            return _alt_graph(cfg), target
-        if target == settings.model_id:
-            return default_graph, settings.model_id
-        if target not in graph_cache:
-            graph_cache[target] = _alt_graph(settings.model_copy(update={"model_id": target}))
-            log.info("built graph for model %s", target)
-        return graph_cache[target], target
+        return build_graph(agents=alt, settings=cfg, event_sink=event_sink), target
 
     app = FastAPI(title="Maestro", version="0.1.0")
 
@@ -153,39 +150,70 @@ def create_app(
     def run(req: RunRequest) -> StreamingResponse:
         state = new_state(req.goal, thread_id=req.thread_id)
         run_id, thread_id = state["run_id"], state["thread_id"]
-        graph, model_id = graph_for(req.model, req.api_key)
         # NB: never log req.api_key — only the goal, thread and model id are logged.
         log.info("run %s START | thread=%s | model=%s | byok=%s | goal=%r",
-                 run_id, thread_id, model_id, bool(req.api_key), req.goal)
+                 run_id, thread_id, req.model or settings.model_id, bool(req.api_key), req.goal)
 
         def stream():
+            # The graph only yields between nodes, so a slow node (planning, or a call
+            # climbing the backoff ladder) would leave the viewer silent for a minute
+            # with no way to tell waiting from hung. Run the graph on its own thread
+            # and forward the events it publishes as they happen.
+            live: "queue.Queue" = queue.Queue()
+            graph, model_id = graph_for(req.model, req.api_key, event_sink=live.put)
+
             yield _sse({"type": "run_started", "agent": "supervisor", "model": model_id,
                         "run_id": run_id, "thread_id": thread_id, "goal": req.goal})
-            emitted = 0
-            last = state
+
+            done = object()
+            outcome: dict = {"last": state, "exc": None}
+
+            def work() -> None:
+                try:
+                    for snap in graph.stream(
+                        state, config={"recursion_limit": settings.max_steps + 10},
+                        stream_mode="values",
+                    ):
+                        outcome["last"] = snap
+                except Exception as exc:  # noqa: BLE001 — surfaced as an SSE frame below
+                    outcome["exc"] = exc
+                finally:
+                    live.put(done)
+
+            worker = threading.Thread(target=work, name=f"run-{run_id}", daemon=True)
+            worker.start()
+
+            seen: set[str] = set()
+
+            def frame(e) -> str:
+                return _sse({
+                    "type": e.event_type.value,
+                    "agent": e.agent,
+                    "summary": e.summary,
+                    "subtask_id": e.subtask_id,
+                    "critic_verdict": e.critic_verdict,
+                    "recovery_decision": e.recovery_decision,
+                    "timestamp": e.timestamp,
+                })
+
+            while True:
+                item = live.get()
+                if item is done:
+                    break
+                uid = item.data.get("uid")
+                if uid:
+                    seen.add(uid)
+                yield frame(item)
+
+            worker.join()
+            last = outcome["last"]
+
             error: Optional[str] = None
-            try:
-                for snap in graph.stream(
-                    state, config={"recursion_limit": settings.max_steps + 10}, stream_mode="values"
-                ):
-                    last = snap
-                    trace = snap.get("trace", [])
-                    for e in trace[emitted:]:
-                        yield _sse(
-                            {
-                                "type": e.event_type.value,
-                                "agent": e.agent,
-                                "summary": e.summary,
-                                "subtask_id": e.subtask_id,
-                                "critic_verdict": e.critic_verdict,
-                                "recovery_decision": e.recovery_decision,
-                                "timestamp": e.timestamp,
-                            }
-                        )
-                    emitted = len(trace)
-            except Exception as exc:  # noqa: BLE001 — a terminal planner/LLM failure must
-                # degrade to a clean SSE frame, not abort the chunked stream (the graph's
-                # recover/degrade ladder only covers researcher subagents, not planning).
+            if outcome["exc"] is not None:
+                # A terminal planner/LLM failure degrades to a clean SSE frame rather
+                # than aborting the chunked stream (the graph's recover/degrade ladder
+                # only covers researcher subagents, not planning).
+                exc = outcome["exc"]
                 error = _friendly_error(exc)
                 log.warning("run %s FAILED mid-stream: %s", run_id, exc)
                 yield _sse({
@@ -193,6 +221,12 @@ def create_app(
                     "subtask_id": None, "critic_verdict": None,
                     "recovery_decision": None, "timestamp": _utcnow(),
                 })
+
+            # Anything recorded in the trace but never published live (or dropped
+            # because a node errored before returning) still belongs in the stream.
+            for e in last.get("trace", []):
+                if e.data.get("uid") not in seen:
+                    yield frame(e)
 
             ans = last.get("final_output")
             yield _sse(

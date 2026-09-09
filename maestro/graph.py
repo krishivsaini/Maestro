@@ -29,8 +29,9 @@ Shape::
 from __future__ import annotations
 
 import threading
+import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 from langgraph.graph import END, START, StateGraph
 
@@ -51,7 +52,7 @@ from .state import (
     TraceEvent,
     new_state,
 )
-from .supervisor import Planner, build_llm_planner, decompose
+from .supervisor import Planner, decompose
 
 log = get_logger("graph")
 
@@ -77,7 +78,10 @@ def build_default_agents(settings: Optional[Settings] = None) -> MaestroAgents:
         critic=Critic(settings=cfg),
         writer=Writer(settings=cfg),
         settings=cfg,
-        planner=build_llm_planner(cfg),
+        # Left None on purpose: decompose() only honours its ``on_retry`` when it
+        # builds the planner itself, so pre-building one here would silently discard
+        # the per-run backoff recorder. Tests still inject their own stub planner.
+        planner=None,
     )
 
 
@@ -100,10 +104,60 @@ def build_graph(
     agents: Optional[MaestroAgents] = None,
     *,
     settings: Optional[Settings] = None,
+    event_sink: Optional[Callable[[TraceEvent], None]] = None,
 ):
-    """Compile and return the Maestro StateGraph."""
+    """Compile and return the Maestro StateGraph.
+
+    ``event_sink`` receives events *as they happen*, before the node producing them
+    returns. The graph stream only yields between nodes, so without it a node that
+    spends a minute planning or climbing the backoff ladder emits nothing at all and
+    a live viewer cannot tell "waiting" apart from "hung". Sunk events are also
+    appended to the run trace, tagged with a uid so a consumer reading both channels
+    can drop the duplicate.
+    """
     ag = agents or build_default_agents(settings)
     cfg = ag.settings
+
+    def _backoff_recorder(
+        sink_to: list[TraceEvent],
+        agent: str,
+        *,
+        subtask_id: Optional[str] = None,
+        lock: Optional[threading.Lock] = None,
+    ):
+        """Build an ``on_retry`` callback that makes the retry ladder visible.
+
+        Every LLM/tool call is backoff-wrapped, so a throttled provider can hold a run
+        for tens of seconds. Reporting each attempt turns that dead air into progress.
+        """
+
+        def on_retry(attempt: int, exc: BaseException, rate_limited: bool) -> None:
+            kind = "rate limit" if rate_limited else "transient error"
+            ev = _ev(
+                EventType.rate_limit_backoff,
+                agent,
+                f"{kind} — retry {attempt}/{cfg.backoff_max_attempts}, backing off",
+                subtask_id=subtask_id,
+            )
+            ev.rate_limit_retry = attempt
+            ev.error = f"{type(exc).__name__}: {exc}"[:200]
+            ev.data["uid"] = uuid.uuid4().hex
+            if lock is not None:
+                with lock:
+                    sink_to.append(ev)
+            else:
+                sink_to.append(ev)
+            if event_sink is not None:
+                event_sink(ev)
+
+        return on_retry
+
+    def _emit(events: list[TraceEvent], ev: TraceEvent) -> None:
+        """Record an event and push it live, so it lands before the node returns."""
+        ev.data["uid"] = uuid.uuid4().hex
+        events.append(ev)
+        if event_sink is not None:
+            event_sink(ev)
 
     def _run_researchers(researchers: list[Subtask], label: str):
         """Run a set of researcher subtasks bounded-parallel; collect evidence + events."""
@@ -112,17 +166,21 @@ def build_graph(
         lock = threading.Lock()
 
         def worker(st: Subtask) -> Subtask:
-            updated, evidence = ag.researcher.run(st, tools=ag.tools, corpus=ag.corpus)
+            # Researchers run in a thread pool, so this recorder appends under the lock.
+            updated, evidence = ag.researcher.run(
+                st, tools=ag.tools, corpus=ag.corpus,
+                on_retry=_backoff_recorder(events, "researcher", subtask_id=st.id, lock=lock),
+            )
             with lock:
                 collected.extend(evidence)
             return updated
 
         def on_event(phase: str, st: Subtask) -> None:  # single-threaded (scheduler loop)
             if phase == "dispatched":
-                events.append(_ev(EventType.subtask_dispatched, "researcher",
+                _emit(events, _ev(EventType.subtask_dispatched, "researcher",
                                   f"{label} {st.id}", subtask_id=st.id))
             else:
-                events.append(_ev(EventType.subagent_result, "researcher",
+                _emit(events, _ev(EventType.subagent_result, "researcher",
                                   f"{st.id} -> {st.status.value}", subtask_id=st.id))
 
         updated, report = run_schedule(researchers, worker, cap=cfg.max_parallel, on_event=on_event)
@@ -132,9 +190,18 @@ def build_graph(
     def supervisor_node(state: MaestroState) -> dict:
         if state.get("subtasks"):
             return {}
-        subs = decompose(state["goal"], planner=ag.planner, settings=cfg)
-        events = [_ev(EventType.plan_produced, "supervisor",
-                      f"planned {len(subs)} subtasks: {[s.id for s in subs]}")]
+        events: list[TraceEvent] = []
+        # Planning is one LLM call and the longest stretch of the run with nothing to
+        # show. Announce it first so the viewer has a live node from the outset, and
+        # pass a recorder so a throttled planner reports each retry instead of stalling.
+        _emit(events, _ev(EventType.subtask_dispatched, "supervisor",
+                          "decomposing the goal into subtasks"))
+        subs = decompose(
+            state["goal"], planner=ag.planner, settings=cfg,
+            on_retry=_backoff_recorder(events, "supervisor"),
+        )
+        _emit(events, _ev(EventType.plan_produced, "supervisor",
+                          f"planned {len(subs)} subtasks: {[s.id for s in subs]}"))
         update = {
             "subtasks": subs,
             "step_count": state.get("step_count", 0) + 1,
@@ -145,7 +212,7 @@ def build_graph(
             hits = ag.memory.query(state["thread_id"], state["goal"], k=3)
             if hits:
                 update["memory_hits"] = hits
-                events.append(_ev(EventType.memory_recall, "supervisor",
+                _emit(events, _ev(EventType.memory_recall, "supervisor",
                                   f"recalled {len(hits)} prior finding(s) from long-term memory"))
         update["trace"] = events
         return update
@@ -169,28 +236,30 @@ def build_graph(
         attempt = state.get("recovery_attempts", 0) + 1
         decision = "retry" if attempt == 1 else "re-delegate"
         retry_subs = [s.model_copy(update={"status": SubtaskStatus.pending}) for s in failed]
-        updated, evidence, events, _ = _run_researchers(retry_subs, f"recover({decision})")
-        rec = _ev(EventType.recovery, "supervisor",
-                  f"recovery attempt {attempt} ({decision}) on {[s.id for s in failed]}",
-                  recovery_decision=decision)
+        # Announce the decision before re-running, so the recovery rung is visible
+        # while the retry is in flight rather than only after it finishes.
+        pre: list[TraceEvent] = []
+        _emit(pre, _ev(EventType.recovery, "supervisor",
+                       f"recovery attempt {attempt} ({decision}) on {[s.id for s in failed]}",
+                       recovery_decision=decision))
         log.info("recovery attempt %d (%s) on %s", attempt, decision, [s.id for s in failed])
+        updated, evidence, events, _ = _run_researchers(retry_subs, f"recover({decision})")
         return {
             "subtasks": updated,
             "evidence": evidence,
             "recovery_attempts": attempt,
-            "trace": [rec] + events,
+            "trace": pre + events,
             "step_count": state.get("step_count", 0) + 1,
         }
 
     def degrade_node(state: MaestroState) -> dict:
         failed = [s for s in _researchers(state["subtasks"]) if s.status == SubtaskStatus.failed]
         degraded = [s.model_copy(update={"status": SubtaskStatus.degraded}) for s in failed]
-        events = [
-            _ev(EventType.degraded, "supervisor",
-                f"degraded {s.id} after exhausting recovery; proceeding on partial evidence",
-                subtask_id=s.id)
-            for s in failed
-        ]
+        events: list[TraceEvent] = []
+        for s in failed:
+            _emit(events, _ev(EventType.degraded, "supervisor",
+                              f"degraded {s.id} after exhausting recovery; proceeding on partial evidence",
+                              subtask_id=s.id))
         return {
             "subtasks": degraded,
             "trace": events,
@@ -213,33 +282,38 @@ def build_graph(
         verdicts = state.get("critic_verdicts", [])
         feedback = verdicts[-1].feedback if (verdicts and verdicts[-1].decision == CriticDecision.rejected) else None
         revision = state.get("critic_iterations", 0)
+        events: list[TraceEvent] = []
         updated, draft = ag.analyst.run(
             analyst_st, state["goal"], state.get("evidence", []),
             feedback=feedback, revision=revision, memory_hits=state.get("memory_hits", []),
+            on_retry=_backoff_recorder(events, "analyst", subtask_id=analyst_st.id),
         )
-        ev = _ev(EventType.subagent_result, "analyst",
-                 f"analysis draft rev {revision}", subtask_id=analyst_st.id)
+        _emit(events, _ev(EventType.subagent_result, "analyst",
+                          f"analysis draft rev {revision}", subtask_id=analyst_st.id))
         return {
             "analysis": draft,
             "subtasks": [updated],
-            "trace": [ev],
+            "trace": events,
             "step_count": state.get("step_count", 0) + 1,
         }
 
     def critique_node(state: MaestroState) -> dict:
         critic_st = _first_by_role(state["subtasks"], Role.critic)
         iteration = state.get("critic_iterations", 0) + 1
+        events: list[TraceEvent] = []
         updated, verdict = ag.critic.run(
-            critic_st, state["goal"], state["analysis"], state.get("evidence", []), iteration=iteration
+            critic_st, state["goal"], state["analysis"], state.get("evidence", []),
+            iteration=iteration,
+            on_retry=_backoff_recorder(events, "critic", subtask_id=critic_st.id),
         )
         etype = EventType.critic_pass if verdict.decision == CriticDecision.passed else EventType.critic_reject
-        ev = _ev(etype, "critic", f"review {iteration}: {verdict.decision.value}",
-                 subtask_id=critic_st.id, critic_verdict=verdict.decision.value)
+        _emit(events, _ev(etype, "critic", f"review {iteration}: {verdict.decision.value}",
+                          subtask_id=critic_st.id, critic_verdict=verdict.decision.value))
         return {
             "critic_verdicts": [verdict],
             "critic_iterations": iteration,
             "subtasks": [updated],
-            "trace": [ev],
+            "trace": events,
             "step_count": state.get("step_count", 0) + 1,
         }
 
@@ -269,8 +343,11 @@ def build_graph(
             halt_reason = "loop detector: critic gave identical feedback repeatedly without progress"
 
         validated = critic_passed and halt_reason is None
+        events: list[TraceEvent] = []
         updated, answer = ag.writer.run(
-            writer_st, state["goal"], state["analysis"], state.get("evidence", []), validated=validated
+            writer_st, state["goal"], state["analysis"], state.get("evidence", []),
+            validated=validated,
+            on_retry=_backoff_recorder(events, "writer", subtask_id=writer_st.id),
         )
         notes = []
         if degraded_subs:
@@ -288,11 +365,13 @@ def build_graph(
         else:
             status = RunStatus.degraded.value
 
-        events = [_ev(EventType.subagent_result, "writer", "final brief composed", subtask_id=writer_st.id)]
+        _emit(events, _ev(EventType.subagent_result, "writer", "final brief composed",
+                          subtask_id=writer_st.id))
         if halt_reason:
-            events.append(_ev(EventType.halted, "supervisor", halt_reason))
+            _emit(events, _ev(EventType.halted, "supervisor", halt_reason))
         elif not critic_passed:
-            events.append(_ev(EventType.degraded, "supervisor", "critic ceiling reached; not fully validated"))
+            _emit(events, _ev(EventType.degraded, "supervisor",
+                              "critic ceiling reached; not fully validated"))
 
         # long-term memory write: persist distilled findings for later turns
         if ag.memory is not None:
@@ -300,10 +379,10 @@ def build_graph(
             for finding in findings:
                 ag.memory.add(state["thread_id"], finding)
             if findings:
-                events.append(_ev(EventType.memory_write, "supervisor",
+                _emit(events, _ev(EventType.memory_write, "supervisor",
                                   f"stored {len(findings)} finding(s) to long-term memory"))
 
-        events.append(_ev(EventType.completed, "supervisor", f"run completed ({status})"))
+        _emit(events, _ev(EventType.completed, "supervisor", f"run completed ({status})"))
         return {
             "final_output": answer,
             "status": status,
