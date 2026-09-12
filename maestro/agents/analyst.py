@@ -22,6 +22,11 @@ You are given a goal and a set of evidence items gathered by researchers.
 Your job:
 - Synthesize a structured analysis/comparison that DIRECTLY addresses the goal.
 - Ground every claim in the provided evidence; reference sources where possible.
+- Organize the analysis around the dimensions that actually decide the question,
+  with a short paragraph per dimension rather than a list of one-liners. Weigh the
+  evidence on each — where the options genuinely differ, and by how much.
+- Do not stop at describing both options; reach a comparative judgement and say what
+  it rests on.
 - If the evidence is thin or conflicting, say so explicitly rather than overclaiming.
 - If critic feedback is provided, address each point in this revision.
 Return a structured draft: a coherent analysis plus the list of key claims you make."""

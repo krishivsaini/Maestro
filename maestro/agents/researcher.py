@@ -26,7 +26,12 @@ You are given ONE specific sub-question and raw search/retrieval results.
 Your job:
 - Extract the most relevant, factual findings that help answer the sub-question.
 - Ground every finding in one of the provided sources; do NOT invent facts or sources.
-- Keep each finding concise. Prefer 2-4 findings.
+- Aim for 4-6 findings. Each one should be substantive: state the specific fact,
+  figure, mechanism or tradeoff — not a topic label. A downstream Analyst sees only
+  these findings, never your sources or reasoning, so a finding that omits the detail
+  loses it for good.
+- Prefer concrete specifics (numbers, named mechanisms, stated limitations) over
+  general statements, and keep distinct points as separate findings.
 Return only the structured findings."""
 
 
