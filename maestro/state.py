@@ -121,11 +121,29 @@ class CriticVerdict(BaseModel):
     created_at: str = Field(default_factory=_utcnow)
 
 
+class Citation(BaseModel):
+    """One source, carrying the number the brief's prose actually uses.
+
+    The Writer is shown evidence as ``[1] (source) ...`` and cites those bracket
+    indices, so a ``[3]`` in the prose means *evidence item 3*. A de-duplicated list
+    of source strings loses that: position 3 of the list is whichever source happened
+    to survive de-duplication third. Keeping the index is what lets a reader match a
+    citation to its source instead of guessing.
+    """
+
+    n: int  # the evidence index the prose cites
+    source: str  # URL or corpus id
+
+
 class Answer(BaseModel):
     """The Writer's final cited composition."""
 
     content: str
     citations: list[str] = Field(default_factory=list)
+    # Same sources as ``citations``, but numbered as the prose cites them. Kept
+    # alongside rather than replacing it so runs persisted before this existed still
+    # replay (the viewer falls back to unnumbered when this is empty).
+    cited: list[Citation] = Field(default_factory=list)
     validated: bool = True  # False when the critic ceiling was hit (degraded)
     notes: Optional[str] = None
 

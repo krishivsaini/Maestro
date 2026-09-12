@@ -250,8 +250,15 @@
   .coda .flag { margin-top: 12px; color: var(--amber); font-size: 13px; font-family: var(--font-mono); }
   .coda .sources { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
   .coda .sources .h { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-  .coda .sources ul { margin: 0; padding-left: 18px; color: #cfc6b8; font-family: var(--font-mono); font-size: 12.5px; }
+  .coda .sources ul, .coda .sources ol { margin: 0; padding-left: 26px; color: #cfc6b8; font-family: var(--font-mono); font-size: 12.5px; }
   .coda .sources li { margin: 3px 0; word-break: break-all; }
+  .coda .sources ol.numbered li::marker { color: var(--brass); font-weight: 600; }
+  /* Jumped-to source: brief highlight so a reviewer following [3] can see where it landed. */
+  .coda .sources li:target { background: rgba(216,166,63,.10); outline: 1px solid var(--brass);
+    outline-offset: 3px; border-radius: 2px; }
+  .coda .brief sup.cite a.cite-link { color: var(--brass); text-decoration: none; }
+  .coda .brief sup.cite a.cite-link:hover { text-decoration: underline; }
+  .coda .brief sup.cite a.cite-link:focus-visible { outline: 1px solid var(--brass-soft); outline-offset: 2px; }
   .coda .sources a { color: var(--v-researcher); text-decoration: none; border-bottom: 1px solid transparent; }
   .coda .sources a:hover { border-bottom-color: var(--v-researcher); }
   .coda .sources a:focus-visible { outline: 2px solid var(--v-researcher); outline-offset: 2px; }
@@ -666,7 +673,14 @@ function mdInline(s) {
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
   s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
-  s = s.replace(/\[(\d+)\]/g, '<sup class="cite">[$1]</sup>');
+  // Citations come through as [3] or [8, 9, 10]. Only the single-number form was
+  // handled, so a grouped citation stayed literal text in the middle of a sentence.
+  // Each number links to its entry in the numbered source list.
+  s = s.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (_m, nums) => {
+    const inner = nums.split(",").map((n) => n.trim()).filter(Boolean)
+      .map((n) => `<a class="cite-link" href="#src-${n}">${n}</a>`).join(", ");
+    return `<sup class="cite">[${inner}]</sup>`;
+  });
   return s;
 }
 function mdToHtml(src) {
@@ -715,9 +729,14 @@ function briefAsText() {
   if (!lastAnswer) return "";
   let out = String(lastAnswer.content || "").trim();
   if (lastAnswer.notes) out += `\n\n> ${lastAnswer.notes}`;
+  // Number the pasted sources the way the prose cites them, not 1..n by position —
+  // otherwise the copied text's [3] points at the wrong line.
+  const numbered = lastAnswer.cited || [];
   const cites = lastAnswer.citations || [];
-  if (cites.length) {
-    out += "\n\n## Sources\n" + cites.map((c, i) => `${i + 1}. ${c}`).join("\n");
+  if (numbered.length) {
+    out += "\n\n## Sources\n" + numbered.map((c) => `${c.n}. ${c.source}`).join("\n");
+  } else if (cites.length) {
+    out += "\n\n## Sources\n" + cites.map((c) => `- ${c}`).join("\n");
   }
   return out + "\n";
 }
@@ -780,9 +799,23 @@ function showFinal(f) {
     $("coda-status").textContent = `${st} · ${f.subtasks ? f.subtasks.length : "?"} voices · ${f.critic_iterations ?? 0} critic pass · ${f.recovery_attempts ?? 0} recoveries`;
     $("coda-brief").innerHTML = mdToHtml(ans.content);
     $("coda-flag").textContent = ans.validated === false ? "⚠ degraded — not fully validated (critic ceiling reached)" : "";
-    const cites = ans.citations || [], src = $("coda-sources");
-    if (cites.length) { src.style.display = "block";
-      src.innerHTML = `<div class="h">sources</div><ul>${cites.map((c) => `<li>${citation(c)}</li>`).join("")}</ul>`; }
+    const src = $("coda-sources");
+    // `cited` carries the number the prose actually uses, so the list can be numbered
+    // to match. `value` sets each number explicitly, which keeps a gap (uncited
+    // evidence) a gap instead of renumbering everything after it.
+    const numbered = ans.cited || [];
+    const cites = ans.citations || [];
+    if (numbered.length) {
+      src.style.display = "block";
+      src.innerHTML = `<div class="h">sources</div><ol class="numbered">` +
+        numbered.map((c) => `<li id="src-${c.n}" value="${c.n}">${citation(c.source)}</li>`).join("") +
+        `</ol>`;
+    } else if (cites.length) {
+      // Runs persisted before `cited` existed: numbering these would be a guess, and
+      // a wrong number is worse than none, so they stay unnumbered.
+      src.style.display = "block";
+      src.innerHTML = `<div class="h">sources</div><ul>${cites.map((c) => `<li>${citation(c)}</li>`).join("")}</ul>`;
+    }
     else src.style.display = "none";
   } else if (f.error) {
     coda.classList.add("show");

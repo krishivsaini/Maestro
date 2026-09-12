@@ -13,7 +13,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from ..resilience import OnRetry
-from ..state import AnalysisDraft, Answer, Evidence, Role, Subtask, SubtaskStatus
+from ..state import AnalysisDraft, Answer, Citation, Evidence, Role, Subtask, SubtaskStatus
 from .base import Subagent
 
 WRITER_PROMPT = """You are a Writer subagent in a multi-agent research system.
@@ -66,6 +66,29 @@ def _resolve_citations(raw: list[str], evidence: list[Evidence]) -> list[str]:
     return out
 
 
+def _numbered_citations(raw: list[str], evidence: list[Evidence]) -> list[Citation]:
+    """Resolve the model's citations to (evidence index, source) pairs.
+
+    Same resolution as ``_resolve_citations``, but it keeps the index so the rendered
+    source list can be numbered the way the prose cites it. De-duplicates by index and
+    orders by it, so gaps (uncited evidence) stay gaps rather than silently shifting
+    every later number down by one.
+    """
+    by_index = {str(i): e.source for i, e in enumerate(evidence, start=1)}
+    first_index = {}
+    for i, e in enumerate(evidence, start=1):
+        first_index.setdefault(e.source, i)
+
+    found: dict[int, str] = {}
+    for c in raw:
+        token = c.strip().strip("[]").strip()
+        if token in by_index:
+            found.setdefault(int(token), by_index[token])
+        elif token in first_index:
+            found.setdefault(first_index[token], token)
+    return [Citation(n=n, source=found[n]) for n in sorted(found)]
+
+
 class Writer(Subagent):
     role = Role.writer
     name = "writer"
@@ -93,7 +116,9 @@ class Writer(Subagent):
             "Critic ceiling reached without a PASS; brief proceeds but is not fully validated."
         )
         citations = _resolve_citations(list(out.citations), evidence)
-        answer = Answer(content=out.content, citations=citations, validated=validated, notes=notes)
+        cited = _numbered_citations(list(out.citations), evidence)
+        answer = Answer(content=out.content, citations=citations, cited=cited,
+                        validated=validated, notes=notes)
         done = subtask.model_copy(update={"status": SubtaskStatus.done, "result": "final brief composed"})
         self.log.info("writer -> final brief (validated=%s, %d citations)", validated, len(answer.citations))
         return done, answer
