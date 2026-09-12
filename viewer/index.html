@@ -221,6 +221,15 @@
     background: var(--stage-2); padding: 22px 24px; }
   .coda.show { display: block; }
   .coda h3 { font-family: var(--font-display); font-weight: 400; font-size: 24px; margin: 0 0 4px; }
+  .coda-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .coda .copy { background: none; border: 1px solid var(--line); color: var(--muted);
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .5px; padding: 5px 12px;
+    border-radius: 3px; cursor: pointer; white-space: nowrap; }
+  .coda .copy:hover:not(:disabled) { color: var(--ivory); border-color: var(--brass); }
+  .coda .copy:disabled { opacity: .4; cursor: default; }
+  .coda .copy:focus-visible { outline: 2px solid var(--brass-soft); outline-offset: 2px; }
+  .coda .copy.done { color: var(--green); border-color: var(--green); }
+  .coda .copy.failed { color: var(--amber); border-color: var(--amber); }
   .coda .status-line { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; color: var(--muted);
     text-transform: uppercase; margin-bottom: 14px; }
   .coda .brief { line-height: 1.7; font-size: 15px; }
@@ -343,7 +352,10 @@
   </div>
 
   <div class="coda" id="coda">
-    <h3>The finished score</h3>
+    <div class="coda-head">
+      <h3>The finished score</h3>
+      <button class="copy" id="copy-brief" type="button">copy brief</button>
+    </div>
     <div class="status-line" id="coda-status"></div>
     <div class="brief" id="coda-brief"></div>
     <div class="flag" id="coda-flag"></div>
@@ -639,6 +651,7 @@ function resetScore() {
   arcs.innerHTML = ""; canvas.style.width = ""; canvas.style.height = "";
   playhead.classList.remove("on"); playhead.style.left = "0px";
   $("ensemble").style.display = "none"; $("coda").classList.remove("show");
+  lastAnswer = null; resetCopy();  // a new run invalidates the previous brief
   $("tempo").classList.add("show");
   $("t-status").textContent = "playing…"; $("t-status").style.color = "var(--ivory)";
   ["t-subtasks","t-critic","t-recover"].forEach((i) => $(i).textContent = "0");
@@ -683,6 +696,69 @@ function mdToHtml(src) {
   return html;
 }
 
+// --- copy the brief -------------------------------------------------------
+// The rendered brief is HTML; what is worth pasting elsewhere is the markdown the
+// writer actually produced, with the sources appended so its [n] citations still
+// resolve away from this page.
+let lastAnswer = null;
+let copyReset;
+
+function resetCopy() {
+  clearTimeout(copyReset);
+  const b = $("copy-brief");
+  b.classList.remove("done", "failed");
+  b.textContent = "copy brief";
+  b.disabled = !lastAnswer;
+}
+
+function briefAsText() {
+  if (!lastAnswer) return "";
+  let out = String(lastAnswer.content || "").trim();
+  if (lastAnswer.notes) out += `\n\n> ${lastAnswer.notes}`;
+  const cites = lastAnswer.citations || [];
+  if (cites.length) {
+    out += "\n\n## Sources\n" + cites.map((c, i) => `${i + 1}. ${c}`).join("\n");
+  }
+  return out + "\n";
+}
+
+async function copyBrief() {
+  const text = briefAsText();
+  if (!text.trim()) return;
+  const b = $("copy-brief");
+  let ok = false;
+  try {
+    // Only defined in a secure context; a viewer opened over plain http has no
+    // clipboard API at all, hence the fallback rather than an unexplained no-op.
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      ok = document.execCommand("copy");
+      ta.remove();
+    }
+  } catch (_) { ok = false; }
+  if (!ok) {
+    // Leave the brief selected so the prompt to copy manually is actually actionable.
+    try {
+      const sel = window.getSelection(), range = document.createRange();
+      range.selectNodeContents($("coda-brief"));
+      sel.removeAllRanges(); sel.addRange(range);
+    } catch (_) { /* selection unavailable — the label still explains the failure */ }
+  }
+  clearTimeout(copyReset);
+  b.classList.toggle("done", ok);
+  b.classList.toggle("failed", !ok);
+  b.textContent = ok ? "copied ✓" : "selected — press ⌘C";
+  copyReset = setTimeout(resetCopy, 2200);
+}
+
 function showFinal(f) {
   pokeSilence(false);
   fitScore();  // show the whole performance, not just wherever the playhead stopped
@@ -699,6 +775,8 @@ function showFinal(f) {
   const coda = $("coda");
   if (ans && ans.content) {
     coda.classList.add("show");
+    lastAnswer = ans;  // kept so the copy button can hand over the source markdown
+    resetCopy();
     $("coda-status").textContent = `${st} · ${f.subtasks ? f.subtasks.length : "?"} voices · ${f.critic_iterations ?? 0} critic pass · ${f.recovery_attempts ?? 0} recoveries`;
     $("coda-brief").innerHTML = mdToHtml(ans.content);
     $("coda-flag").textContent = ans.validated === false ? "⚠ degraded — not fully validated (critic ceiling reached)" : "";
@@ -708,6 +786,7 @@ function showFinal(f) {
     else src.style.display = "none";
   } else if (f.error) {
     coda.classList.add("show");
+    lastAnswer = null; resetCopy();  // nothing to copy on a failed run
     $("coda-status").textContent = st; $("coda-brief").textContent = "";
     $("coda-flag").textContent = "✗ " + f.error; $("coda-sources").style.display = "none";
     // if the primary model is throttled, offer the fallback right in the UI
@@ -867,6 +946,8 @@ addEventListener("resize", () => {
 $("run").onclick = conduct;
 $("goal").addEventListener("keydown", (e) => { if (e.key === "Enter") conduct(); });
 $("refresh").onclick = loadRuns;
+$("copy-brief").onclick = copyBrief;
+resetCopy();  // disabled until a run produces a brief
 const ex = $("examples");
 for (const g of EXAMPLES) {
   const s = document.createElement("span");
