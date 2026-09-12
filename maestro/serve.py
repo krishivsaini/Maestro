@@ -193,6 +193,7 @@ def create_app(
                     "subtask_id": e.subtask_id,
                     "critic_verdict": e.critic_verdict,
                     "recovery_decision": e.recovery_decision,
+                    "rate_limit_retry": e.rate_limit_retry,
                     "timestamp": e.timestamp,
                 })
 

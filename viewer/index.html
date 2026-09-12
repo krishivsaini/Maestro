@@ -243,6 +243,9 @@
   .coda .sources .h { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
   .coda .sources ul { margin: 0; padding-left: 18px; color: #cfc6b8; font-family: var(--font-mono); font-size: 12.5px; }
   .coda .sources li { margin: 3px 0; word-break: break-all; }
+  .coda .sources a { color: var(--v-researcher); text-decoration: none; border-bottom: 1px solid transparent; }
+  .coda .sources a:hover { border-bottom-color: var(--v-researcher); }
+  .coda .sources a:focus-visible { outline: 2px solid var(--v-researcher); outline-offset: 2px; }
 
   /* ---- repertoire (past runs) ---- */
   .repertoire { margin-top: 40px; }
@@ -441,6 +444,16 @@ function pokeSilence(active) {
     $("t-status").textContent = "backing off…"; $("t-status").style.color = "var(--amber)";
   }, 5000);
 }
+
+// A retry does not get a note on the score; it updates the movement readout, which is
+// where "this is waiting, not broken" belongs. Named so the supervisor's own lane
+// stays about coordination.
+function noteBackoff(ev) {
+  clearTimeout(silence);
+  const n = ev.rate_limit_retry;
+  $("t-status").textContent = n ? `retrying ${n}…` : "backing off…";
+  $("t-status").style.color = "var(--amber)";
+}
 const LANE_H = () => parseInt(cssv("--lane-h"));
 // Horizontal scale. 1 while playing (full-size notes, the score scrolls to follow the
 // playhead); shrunk on finish so the whole performance fits — see fitScore().
@@ -508,9 +521,24 @@ function ensureLane(info) {
   return lane;
 }
 function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+// esc() escapes & < > but not quotes, which is fine for text nodes and unsafe inside
+// an attribute — a value containing a double quote would break out of href="…".
+const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
+
+// Citations are model output. Linkify only http(s) — anything else (a local corpus id
+// like "src_solar", or a javascript: URL) stays inert text.
+function citation(c) {
+  const s = String(c == null ? "" : c).trim();
+  if (!/^https?:\/\//i.test(s)) return esc(s);
+  return `<a href="${escAttr(s)}" target="_blank" rel="noopener noreferrer">${esc(s)}</a>`;
+}
 
 function addNote(ev) {
   const kind = ev.type || ev.event_type, agent = ev.agent || "";
+  // Backoff retries are noise on the score — a throttled call can emit six of them
+  // and they crowd out the actual coordination. They still reach the tempo readout
+  // below (and the persisted trace), so the run reads as waiting rather than hung.
+  if (kind === "rate_limit_backoff") { noteBackoff(ev); return; }
   const info = laneKey(ev), lane = ensureLane(info);
   const key = kind + "|" + agent;
   if (prevKey !== null && key !== prevKey) beat++;
@@ -676,7 +704,7 @@ function showFinal(f) {
     $("coda-flag").textContent = ans.validated === false ? "⚠ degraded — not fully validated (critic ceiling reached)" : "";
     const cites = ans.citations || [], src = $("coda-sources");
     if (cites.length) { src.style.display = "block";
-      src.innerHTML = `<div class="h">sources</div><ul>${cites.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>`; }
+      src.innerHTML = `<div class="h">sources</div><ul>${cites.map((c) => `<li>${citation(c)}</li>`).join("")}</ul>`; }
     else src.style.display = "none";
   } else if (f.error) {
     coda.classList.add("show");
@@ -721,7 +749,9 @@ async function conduct() {
         const ev = JSON.parse(line.slice(5).trim());
         if (ev.type === "run_started") { $("t-run").textContent = ev.run_id.slice(0, 8); addNote(ev); pokeSilence(true); }
         else if (ev.type === "final") showFinal(ev);
-        else { addNote(ev); pokeSilence(true); }
+        // A backoff event sets its own "retrying N…" movement; pokeSilence would
+        // immediately overwrite that with "playing…".
+        else { addNote(ev); if (ev.type !== "rate_limit_backoff") pokeSilence(true); }
       }
     }
   } catch (e) {
