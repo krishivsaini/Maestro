@@ -66,18 +66,37 @@ def create_app(
     agents: Optional[MaestroAgents] = None,
     memory: object = None,
     trace_store: Optional[TraceStore] = None,
+    memory_dir: Optional[str] = None,
 ) -> FastAPI:
-    """Build the FastAPI app. Inject stub ``agents`` / an in-memory store for tests."""
+    """Build the FastAPI app. Inject stub ``agents`` / an in-memory store for tests.
+
+    Long-term memory is kept on disk (``memory_store_dir``) so a follow-up can still
+    recall its thread's findings after a restart; held only in RAM, every restart
+    silently turned follow-ups on earlier runs into fresh starts. Injected stub agents
+    stay in-memory unless a ``memory_dir`` is passed explicitly.
+    """
     settings = get_settings()
     injected = agents is not None  # stub agents (tests) are not model-switchable
     if agents is None:
         agents = build_default_agents(settings)
+    mem_dir = memory_dir if memory_dir is not None else (None if injected else settings.memory_store_dir)
     # attach thread-scoped long-term memory (HashingEmbedder default -> no torch)
     if memory is not None:
         agents.memory = memory
     elif agents.memory is None:
-        agents.memory = LongTermMemory(embedder=HashingEmbedder())
+        agents.memory = (LongTermMemory.load(mem_dir, embedder=HashingEmbedder()) if mem_dir
+                         else LongTermMemory(embedder=HashingEmbedder()))
     store = trace_store if trace_store is not None else TraceStore(settings.trace_db_path)
+    mem_lock = threading.Lock()
+
+    def persist_memory() -> None:
+        if not mem_dir or not hasattr(agents.memory, "persist"):
+            return
+        try:
+            with mem_lock:
+                agents.memory.persist(mem_dir)
+        except Exception as exc:  # a failed save must not break the response
+            log.warning("failed to persist long-term memory: %s", exc)
 
     # A run can pick the primary or the higher-throughput alternative from the UI
     # (e.g. when the primary hits its free-tier daily quota). Every graph shares the
@@ -195,6 +214,10 @@ def create_app(
                     "recovery_decision": e.recovery_decision,
                     "rate_limit_retry": e.rate_limit_retry,
                     "timestamp": e.timestamp,
+                    "plan": e.data.get("plan"),
+                    # what memory actually held, so a follow-up can show what it drew on
+                    "recalled": e.data.get("recalled"),
+                    "stored": e.data.get("stored"),
                 })
 
             while True:
@@ -229,6 +252,14 @@ def create_app(
                 if e.data.get("uid") not in seen:
                     yield frame(e)
 
+            # Save before the final frame: a viewer reacts to it by fetching the thread,
+            # and must find this run (and its findings) already there.
+            if error is None:  # only persist genuinely completed runs
+                try:
+                    store.save_run(last)
+                except Exception as exc:  # persistence failure must not break the response
+                    log.warning("failed to persist run %s: %s", run_id, exc)
+                persist_memory()
             ans = last.get("final_output")
             yield _sse(
                 {
@@ -239,18 +270,14 @@ def create_app(
                     "answer": ans.model_dump() if ans else None,
                     "error": error,
                     "subtasks": [
-                        {"id": s.id, "role": s.role.value, "status": s.status.value}
+                        {"id": s.id, "role": s.role.value, "status": s.status.value,
+                         "description": s.description, "depends_on": list(s.depends_on)}
                         for s in last.get("subtasks", [])
                     ],
                     "critic_iterations": last.get("critic_iterations", 0),
                     "recovery_attempts": last.get("recovery_attempts", 0),
                 }
             )
-            if error is None:  # only persist genuinely completed runs
-                try:
-                    store.save_run(last)
-                except Exception as exc:  # persistence failure must not break the response
-                    log.warning("failed to persist run %s: %s", run_id, exc)
             log.info(
                 "run %s DONE | status=%s | steps=%s | critic_iters=%s | recoveries=%s",
                 run_id, "error" if error else last.get("status"), last.get("step_count"),
@@ -262,6 +289,13 @@ def create_app(
     @app.get("/runs")
     def list_runs() -> dict:
         return {"runs": store.list_runs()}
+
+    @app.get("/threads/{thread_id}")
+    def get_thread(thread_id: str) -> dict:
+        """A thread's runs in conversation order, and how much memory a follow-up has."""
+        count = getattr(agents.memory, "count", None)
+        return {"thread_id": thread_id, "runs": store.list_runs(thread_id=thread_id),
+                "memory_findings": count(thread_id) if count else 0}
 
     @app.get("/runs/{run_id}")
     def get_run(run_id: str):

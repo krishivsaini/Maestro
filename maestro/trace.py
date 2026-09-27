@@ -123,10 +123,13 @@ class TraceStore:
         row = self.conn.execute("SELECT payload FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         return RunRecord.model_validate_json(row["payload"]) if row else None
 
-    def list_runs(self) -> list[dict]:
-        rows = self.conn.execute(
-            "SELECT run_id, thread_id, goal, status, created_at, event_count FROM runs ORDER BY created_at DESC"
-        ).fetchall()
+    def list_runs(self, thread_id: Optional[str] = None) -> list[dict]:
+        """Newest first; a thread's runs come back oldest first, in conversation order."""
+        cols = "SELECT run_id, thread_id, goal, status, created_at, event_count FROM runs"
+        if thread_id is not None:
+            rows = self.conn.execute(f"{cols} WHERE thread_id = ? ORDER BY created_at ASC", (thread_id,)).fetchall()
+        else:
+            rows = self.conn.execute(f"{cols} ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
 
     def replay(self, run_id: str) -> Iterator[TraceEvent]:

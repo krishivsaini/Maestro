@@ -200,8 +200,13 @@ def build_graph(
             state["goal"], planner=ag.planner, settings=cfg,
             on_retry=_backoff_recorder(events, "supervisor"),
         )
+        # The plan rides along with the event so a live viewer can show what each
+        # subtask is for and what it waits on, not just a list of ids.
         _emit(events, _ev(EventType.plan_produced, "supervisor",
-                          f"planned {len(subs)} subtasks: {[s.id for s in subs]}"))
+                          f"planned {len(subs)} subtasks: {[s.id for s in subs]}",
+                          data={"plan": [{"id": s.id, "role": s.role.value,
+                                          "description": s.description,
+                                          "depends_on": list(s.depends_on)} for s in subs]}))
         update = {
             "subtasks": subs,
             "step_count": state.get("step_count", 0) + 1,
@@ -213,7 +218,8 @@ def build_graph(
             if hits:
                 update["memory_hits"] = hits
                 _emit(events, _ev(EventType.memory_recall, "supervisor",
-                                  f"recalled {len(hits)} prior finding(s) from long-term memory"))
+                                  f"recalled {len(hits)} prior finding(s) from long-term memory",
+                                  data={"recalled": [h.content for h in hits]}))
         update["trace"] = events
         return update
 
@@ -380,7 +386,8 @@ def build_graph(
                 ag.memory.add(state["thread_id"], finding)
             if findings:
                 _emit(events, _ev(EventType.memory_write, "supervisor",
-                                  f"stored {len(findings)} finding(s) to long-term memory"))
+                                  f"stored {len(findings)} finding(s) to long-term memory",
+                                  data={"stored": list(findings)}))
 
         _emit(events, _ev(EventType.completed, "supervisor", f"run completed ({status})"))
         return {

@@ -100,6 +100,59 @@ def test_run_streams_coordination(make_stub):
     assert final["critic_iterations"] == 2
 
 
+def test_plan_streams_with_descriptions_and_dependencies(make_stub):
+    # The viewer shows what each subtask is for and what it waits on while the run is
+    # still going, so the plan has to arrive with the plan_produced frame.
+    client = make_client(make_stub, [CriticDecision.passed], TraceStore(":memory:"))
+    events = _parse_sse(client.post("/run", json={"goal": "Compare solar and wind"}).text)
+    plan = next(e for e in events if e["type"] == "plan_produced")["plan"]
+    assert plan and all(p["id"] and p["role"] and p["description"] for p in plan)
+    ids = {p["id"] for p in plan}
+    assert all(set(p["depends_on"]) <= ids for p in plan)
+    assert any(p["depends_on"] for p in plan)  # later stages wait on earlier ones
+    # other frames carry no plan, and the final frame repeats it with statuses
+    assert all(e.get("plan") is None for e in events if e["type"] not in ("plan_produced", "final"))
+    final = events[-1]
+    assert {s["id"] for s in final["subtasks"]} == ids
+    assert all("description" in s and "depends_on" in s for s in final["subtasks"])
+
+
+def test_follow_up_recalls_memory_after_a_restart(make_stub, tmp_path):
+    # A follow-up draws on its thread's findings. Those must survive a server restart,
+    # or every follow-up on an earlier run silently starts from nothing.
+    def topical(responder):
+        def wrapped(schema, messages):
+            if getattr(schema, "__name__", "") == "AnalysisModel":
+                return AnalysisModel(content="analysis", claims=[
+                    "wind has the higher capacity factor for the grid",
+                    "solar output peaks midday and needs storage"])
+            return responder(schema, messages)
+        return make_stub(wrapped)
+
+    store, mem_dir = TraceStore(":memory:"), str(tmp_path / "memory")
+
+    def client():
+        agents = build_stub_agents(topical, [CriticDecision.passed])
+        return TestClient(create_app(agents=agents, trace_store=store, memory_dir=mem_dir))
+
+    first = _parse_sse(client().post("/run", json={"goal": "Compare solar and wind", "thread_id": "t1"}).text)
+    wrote = next(e for e in first if e["type"] == "memory_write")
+    assert len(wrote["stored"]) == 2  # the stream says what was saved, not just how many
+
+    restarted = client()  # a fresh app over the same memory directory
+    thread = restarted.get("/threads/t1").json()
+    assert thread["memory_findings"] == 2
+    assert [r["goal"] for r in thread["runs"]] == ["Compare solar and wind"]
+
+    goal = 'Follow-up to "Compare solar and wind": how much storage does solar need?'
+    second = _parse_sse(restarted.post("/run", json={"goal": goal, "thread_id": "t1"}).text)
+    recalled = next(e for e in second if e["type"] == "memory_recall")["recalled"]
+    assert any("solar" in r for r in recalled)
+    runs = restarted.get("/threads/t1").json()["runs"]
+    assert [r["goal"] for r in runs] == ["Compare solar and wind", goal]  # conversation order
+    assert restarted.get("/threads/nobody").json() == {"thread_id": "nobody", "runs": [], "memory_findings": 0}
+
+
 def test_models_endpoint_and_stub_ignores_switch(make_stub):
     client = make_client(make_stub, [CriticDecision.passed], TraceStore(":memory:"))
     m = client.get("/models").json()

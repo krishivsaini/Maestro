@@ -122,6 +122,10 @@ class LongTermMemory:
                 break
         return hits
 
+    def count(self, thread_id: str) -> int:
+        """How many findings this thread has stored — what a follow-up can draw on."""
+        return sum(1 for m in self.meta if m["thread_id"] == thread_id)
+
     # --- persistence ---
     def persist(self, directory: str) -> None:
         os.makedirs(directory, exist_ok=True)
