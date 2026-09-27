@@ -3,99 +3,108 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Maestro — the conductor's score</title>
+<title>Maestro — watch a team of agents research a question</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%23d8a63f'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --stage: #16121d; --stage-2: #1d1727; --stage-3: #271f34; --line: #372f47;
-    --ivory: #f0e9dc; --muted: #9a8fa8;
+    --stage: #16121d; --stage-2: #1d1727; --stage-3: #271f34; --line: #372f47; --line-soft: #2a2336;
+    --ivory: #f0e9dc; --text-2: #d7cebf; --muted: #a095ae;
     --brass: #d8a63f; --brass-soft: #eacd82;
-    --v-supervisor: #d8a63f; --v-researcher: #45b8a4; --v-analyst: #6c8ff0;
-    --v-critic: #e0685c; --v-writer: #b07de6; --v-memory: #9d8ec9;
-    --amber: #e0973c; --green: #5bbf7a; --red: #d9534f;
+    --v-supervisor: #d8a63f; --v-researcher: #45b8a4; --v-analyst: #7896f2;
+    --v-critic: #e6776b; --v-writer: #b98aea; --v-memory: #a697d4;
+    --amber: #e0a04c; --green: #62c784; --red: #e26a66;
     --font-display: "Instrument Serif", Georgia, serif;
     --font-ui: "Space Grotesk", system-ui, -apple-system, sans-serif;
     --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-    --lane-h: 76px; --beat-w: 210px; --note-w: 184px;
+    --lane-h: 78px; --beat-w: 204px; --note-w: 184px; --gutter-w: 164px;
+    --r-sm: 4px; --r-md: 7px;
   }
   * { box-sizing: border-box; }
+  /* Several panels set their own display; without this the hidden attribute loses. */
+  [hidden] { display: none !important; }
   html, body { margin: 0; }
   body {
     background:
-      radial-gradient(1200px 480px at 78% -8%, rgba(216,166,63,.10), transparent 60%),
-      radial-gradient(900px 500px at 5% 4%, rgba(108,143,240,.07), transparent 55%),
+      radial-gradient(1100px 440px at 80% -10%, rgba(216,166,63,.09), transparent 60%),
       var(--stage);
     color: var(--ivory); font-family: var(--font-ui);
     font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 30px 26px 80px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 88px; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--brass-soft); outline-offset: 2px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  code, .mono { font-family: var(--font-mono); font-size: .88em; }
+  a { color: var(--v-researcher); }
 
-  /* ---- header / hero ---- */
-  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
-  .brand { display: flex; align-items: baseline; gap: 16px; }
+  /* ---- header ---- */
+  /* Wordmark and description sit side by side as one unit, the description's top
+     aligned to the wordmark's cap height, rather than pinned to opposite edges. */
+  header { display: flex; align-items: center; gap: 14px 36px; flex-wrap: wrap; }
   .mark {
-    font-family: var(--font-display); font-size: 62px; line-height: .9; letter-spacing: .5px;
+    font-family: var(--font-display); font-size: 92px; line-height: .86; letter-spacing: -.5px; margin: 0; font-weight: 400;
+    padding-bottom: 6px;  /* room for the descenders the tight line-height would clip */
     background: linear-gradient(180deg, var(--brass-soft), var(--brass));
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
-  .baton { font-style: italic; color: var(--muted); font-family: var(--font-display); font-size: 26px; }
-  .tagline { color: var(--muted); font-size: 13.5px; max-width: 340px; text-align: right; }
-  .tagline b { color: var(--ivory); font-weight: 500; }
-  .rule { height: 1px; margin: 22px 0 24px;
-    background: linear-gradient(90deg, transparent, var(--line) 12%, var(--line) 88%, transparent); }
+  .lede { margin: 0; color: var(--text-2); font-size: 16px; line-height: 1.55; flex: 1 1 380px; max-width: 700px; text-wrap: pretty;
+    padding-left: 36px; border-left: 1px solid var(--line); }
 
-  /* ---- commission bar ---- */
-  .commission { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-  .field { position: relative; flex: 1 1 380px; min-width: 240px; }
-  .field label { position: absolute; top: -8px; left: 12px; padding: 0 6px; background: var(--stage);
-    font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
-  input[type=text] {
-    width: 100%; background: var(--stage-2); border: 1px solid var(--line); color: var(--ivory);
-    padding: 13px 15px; border-radius: 3px; font: inherit; font-size: 15px;
+  /* ---- ask ---- */
+  .ask { margin-top: 26px; padding: 20px 20px 16px; background: var(--stage-2);
+    border: 1px solid var(--line); border-radius: var(--r-md); }
+  .ask-label { display: block; font-size: 14px; font-weight: 500; color: var(--text-2); margin-bottom: 9px; }
+  .ask-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .ask-row input { flex: 1 1 420px; min-width: 0; }
+  input[type=text], input[type=password] {
+    width: 100%; background: var(--stage); border: 1px solid var(--line); color: var(--ivory);
+    padding: 13px 15px; border-radius: var(--r-sm); font: inherit; font-size: 16px;
   }
-  input[type=text]:focus { outline: none; border-color: var(--brass); box-shadow: 0 0 0 3px rgba(216,166,63,.14); }
-  #thread { flex: 0 1 190px; min-width: 150px; }
-  #thread input { font-family: var(--font-mono); font-size: 13px; }
-  button.conduct {
+  input::placeholder { color: #756b83; }
+  input:focus { outline: none; border-color: var(--brass); box-shadow: 0 0 0 3px rgba(216,166,63,.16); }
+  .primary {
     background: linear-gradient(180deg, var(--brass-soft), var(--brass)); color: #201400; border: 0;
-    font-family: var(--font-ui); font-weight: 700; font-size: 15px; letter-spacing: .3px;
-    padding: 13px 24px; border-radius: 3px; cursor: pointer; white-space: nowrap;
+    font-weight: 700; font-size: 15px; padding: 0 24px; min-height: 48px; border-radius: var(--r-sm);
+    cursor: pointer; white-space: nowrap; flex: 0 0 auto;
   }
-  button.conduct:hover { filter: brightness(1.06); }
-  button.conduct:disabled { opacity: .5; cursor: default; filter: none; }
-  button.conduct:focus-visible { outline: 2px solid var(--brass-soft); outline-offset: 2px; }
-  .examples { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .examples span {
-    color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 11px; border-radius: 2px;
-    border: 1px solid var(--line); font-family: var(--font-mono);
-  }
-  .examples span:hover { color: var(--ivory); border-color: var(--v-researcher); }
+  .primary:hover { filter: brightness(1.06); }
+  .primary:disabled { opacity: .55; cursor: default; filter: none; }
+  .examples { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .examples .try { color: var(--muted); font-size: 13px; margin-right: 2px; }
+  .chipbtn { background: transparent; border: 1px solid var(--line); color: var(--text-2); font-size: 13px;
+    padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+  .chipbtn:hover { border-color: var(--v-researcher); color: var(--ivory); }
 
-  .modelbar { display: none; align-items: center; gap: 11px; margin-top: 13px; flex-wrap: wrap; }
-  .modelbar .mlabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
-  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
-  .segbtn { background: var(--stage-2); color: var(--muted); border: 0; font-family: var(--font-mono); font-size: 12px; padding: 6px 13px; cursor: pointer; }
+  details.options { margin-top: 14px; border-top: 1px solid var(--line-soft); padding-top: 12px; }
+  details.options summary { cursor: pointer; font-size: 13px; color: var(--muted); list-style: none;
+    display: inline-flex; gap: 8px; align-items: center; }
+  details.options summary::-webkit-details-marker { display: none; }
+  /* Drawn, not a glyph: Space Grotesk has no ▸ and the fallback renders a dot. */
+  details.options summary::before { content: ""; width: 6px; height: 6px; margin: 0 2px 0 1px;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg); transition: transform .15s; }
+  details.options[open] summary::before { transform: rotate(45deg); }
+  details.options summary b { color: var(--text-2); font-weight: 500; }
+  #opt-summary { color: var(--muted); }
+  .opt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px 24px; margin-top: 14px; }
+  .opt label, .opt .opt-name { display: block; font-size: 13px; font-weight: 500; color: var(--text-2); margin-bottom: 6px; }
+  .opt input { font-size: 14px; padding: 10px 12px; }
+  .opt input#threadin { font-family: var(--font-mono); font-size: 13px; }
+  .hint { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .warn { margin: 6px 0 0; font-size: 12.5px; color: var(--amber); }
+  .warn:empty { display: none; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+  .segbtn { background: var(--stage); color: var(--muted); border: 0; font-family: var(--font-mono); font-size: 12.5px; padding: 8px 13px; cursor: pointer; }
   .segbtn + .segbtn { border-left: 1px solid var(--line); }
-  .segbtn.active { background: linear-gradient(180deg, var(--brass-soft), var(--brass)); color: #201400; font-weight: 600; }
-  .segbtn:not(.active):hover { color: var(--ivory); }
-  .mnote { font-family: var(--font-mono); font-size: 11.5px; color: var(--amber); }
-
-  .keyctl { margin-top: 13px; }
-  .keytoggle { font-family: var(--font-mono); font-size: 12px; color: var(--muted); cursor: pointer;
-    border: 1px dashed var(--line); border-radius: 2px; padding: 5px 12px; }
-  .keytoggle:hover { color: var(--ivory); border-color: var(--brass); }
-  .keyrow { display: none; margin-top: 12px; gap: 11px; flex-wrap: wrap; align-items: center; }
-  .keyrow.show { display: flex; }
-  .keyrow .field { flex: 1 1 320px; }
-  .keynote { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
-  .keynote a { color: var(--v-researcher); }
-  #keymsg { font-family: var(--font-mono); font-size: 11.5px; color: var(--amber); }
+  .segbtn[aria-pressed="true"] { background: linear-gradient(180deg, var(--brass-soft), var(--brass)); color: #201400; font-weight: 500; }
+  .segbtn[aria-pressed="false"]:hover { color: var(--ivory); }
 
   /* ---- waking the backend (free-tier cold start) ---- */
-  .waking { display: none; align-items: center; gap: 11px; margin-top: 16px; padding: 11px 15px;
-    border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 4px;
+  .waking { display: none; align-items: center; gap: 11px; margin-top: 14px; padding: 11px 15px;
+    border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: var(--r-sm);
     background: var(--stage-2); flex-wrap: wrap; }
   .waking.show { display: flex; }
   .waking.ready { border-left-color: var(--green); }
@@ -103,88 +112,102 @@
     flex: none; animation: breathe 1.5s ease-in-out infinite; }
   .waking.ready .pulse { background: var(--green); animation: none; }
   @keyframes breathe { 0%,100% { opacity: .35; } 50% { opacity: 1; box-shadow: 0 0 9px var(--amber); } }
-  .waking .wt { font-family: var(--font-mono); font-size: 13px; color: var(--ivory); }
-  .waking .wt b { color: var(--amber); font-weight: 600; }
+  .waking .wt { font-size: 14px; color: var(--ivory); }
+  .waking .wt b { color: var(--amber); font-weight: 600; font-variant-numeric: tabular-nums; }
   .waking.ready .wt b { color: var(--green); }
-  .waking .wn { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); margin-left: auto; }
-  @media (prefers-reduced-motion: reduce) { .waking .pulse { animation: none; opacity: 1; } }
+  .waking .wn { font-size: 12.5px; color: var(--muted); margin-left: auto; }
 
-  /* ---- tempo / dynamics readout ---- */
-  .tempo { display: none; gap: 26px; flex-wrap: wrap; margin: 24px 2px 6px; }
-  .tempo.show { display: flex; }
-  .tempo .m { display: flex; flex-direction: column; gap: 1px; }
-  .tempo .m b { font-family: var(--font-mono); font-size: 19px; font-weight: 600; }
-  .tempo .m small { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  /* ---- run bar: status + where the run is ---- */
+  .runbar { margin-top: 26px; }
+  .rb-top { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px;
+    padding: 4px 12px 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--stage-2);
+    --c: var(--brass); color: var(--c); }
+  .pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+  .pill.running::before { animation: breathe 1.4s ease-in-out infinite; }
+  .pill.completed { --c: var(--green); } .pill.degraded { --c: var(--amber); }
+  .pill.halted, .pill.error { --c: var(--red); }
+  .rb-fact { font-size: 13.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rb-fact b { color: var(--text-2); font-weight: 500; }
+  .rb-goal { flex: 1 1 260px; min-width: 0; font-size: 14px; color: var(--text-2);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rb-actions { display: flex; gap: 8px; margin-left: auto; }
+  .ghost { background: none; border: 1px solid var(--line); color: var(--text-2); font-size: 13px;
+    padding: 6px 13px; border-radius: var(--r-sm); cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .ghost:hover:not(:disabled) { border-color: var(--brass); color: var(--ivory); }
+  .ghost:disabled { opacity: .4; cursor: default; }
+
+  .stages { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .stage { position: relative; padding: 0 8px 0 0; }
+  .stage .bar { height: 3px; border-radius: 2px; background: var(--line); margin-bottom: 9px; overflow: hidden; }
+  .stage.done .bar { background: var(--v); }
+  .stage.active .bar { background: linear-gradient(90deg, var(--v), transparent);
+    background-size: 200% 100%; animation: sweep 1.6s linear infinite; }
+  @keyframes sweep { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  .stage .sn { font-size: 13.5px; font-weight: 600; color: var(--muted); }
+  .stage.done .sn, .stage.active .sn { color: var(--ivory); }
+  .stage .sd { font-size: 12.5px; color: var(--muted); min-height: 1.45em; }
+  .stage .sd .w { color: var(--amber); } .stage .sd .x { color: var(--v-critic); }
 
   /* ---- the score ---- */
-  /* wrap, and keep the title itself unbreakable — the mono hint beside it is long
-     enough to squeeze "The score" onto two lines at narrow widths otherwise. */
-  .score-title { display: flex; align-items: baseline; gap: 12px; margin: 26px 2px 12px; flex-wrap: wrap; }
-  .score-title h2 { font-family: var(--font-display); font-weight: 400; font-size: 27px; margin: 0;
-    flex: none; white-space: nowrap; }
-  .score-title span { color: var(--muted); font-size: 12px; font-family: var(--font-mono); letter-spacing: 1px; }
+  .score-head { display: flex; align-items: baseline; gap: 6px 14px; margin: 26px 0 10px; flex-wrap: wrap; }
+  .score-head h2 { font-family: var(--font-display); font-weight: 400; font-size: 28px; margin: 0; line-height: 1.1; }
+  .score-head p { margin: 0; color: var(--muted); font-size: 13px; }
 
   .score {
-    position: relative; display: grid; grid-template-columns: 150px 1fr;
-    border: 1px solid var(--line); border-radius: 5px; background:
-      linear-gradient(180deg, rgba(255,255,255,.012), transparent 40%), var(--stage-2);
+    position: relative; display: grid; grid-template-columns: var(--gutter-w) 1fr;
+    border: 1px solid var(--line); border-radius: var(--r-md); background: var(--stage-2);
     overflow: hidden; min-height: 300px;
   }
-  /* All three share row 1 so they stack; the ensemble is a real grid item rather
-     than an absolute overlay, so its text contributes height instead of being
-     clipped by the 300px min-height on narrow screens. */
+  /* All three share row 1 so they stack; the empty state is a real grid item rather
+     than an absolute overlay, so its text contributes height instead of being clipped. */
   .gutter { grid-area: 1 / 1; position: relative; z-index: 3; border-right: 1px solid var(--line); background: var(--stage-2); }
   /* min-width:0 — a grid track defaults to min-content, which a wide canvas would
      otherwise blow past instead of scrolling inside canvas-wrap. */
-  .canvas-wrap { grid-area: 1 / 2; min-width: 0; }
-
+  .canvas-wrap { grid-area: 1 / 2; min-width: 0; overflow-x: auto; overflow-y: hidden; position: relative; scroll-behavior: smooth; }
   /* Right-edge fade: the only cue that the score continues past the viewport. */
   .score.scrollable::after {
-    content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 60px; z-index: 3;
+    content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 56px; z-index: 3;
     pointer-events: none; background: linear-gradient(90deg, transparent, var(--stage-2) 88%);
   }
-  .gutter .lane-label {
-    height: var(--lane-h); padding: 0 12px; display: flex; flex-direction: column; justify-content: center;
-    border-bottom: 1px solid rgba(255,255,255,.03); position: relative;
+  .lane-label {
+    height: var(--lane-h); padding: 0 12px 0 16px; display: flex; flex-direction: column; justify-content: center;
+    border-bottom: 1px solid var(--line-soft); position: relative;
   }
-  .gutter .lane-label::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px;
+  .lane-label::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px;
     background: var(--voice, var(--muted)); border-radius: 0 2px 2px 0; }
-  .lane-label .nm { font-family: var(--font-mono); font-size: 12.5px; font-weight: 500; color: var(--ivory);
+  .lane-label .nm { font-size: 14px; font-weight: 600; color: var(--ivory);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .lane-label .rl { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+  .lane-label .nm.id { font-family: var(--font-mono); font-size: 12.5px; font-weight: 500; }
+  .lane-label .rl { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .canvas-wrap { overflow-x: auto; overflow-y: hidden; position: relative; scroll-behavior: smooth; }
   .canvas-wrap::-webkit-scrollbar { height: 8px; }
   .canvas-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
-  .canvas-wrap::-webkit-scrollbar-thumb:hover { background: var(--muted); }
   .canvas { position: relative; height: 100%; }
-  .lane-rule { position: absolute; left: 0; right: 0; height: var(--lane-h);
-    border-bottom: 1px solid rgba(255,255,255,.03); }
+  .lane-rule { position: absolute; left: 0; right: 0; height: var(--lane-h); border-bottom: 1px solid var(--line-soft); }
   .lane-rule::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px;
     background: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 6px, transparent 6px 13px); }
 
   .note {
-    position: absolute; width: var(--note-w); border: 1px solid var(--line);
-    border-left: 3px solid var(--voice, var(--muted)); border-radius: 4px;
-    background: linear-gradient(180deg, var(--stage-3), var(--stage-2));
-    padding: 7px 10px 8px; z-index: 2; box-shadow: 0 6px 16px rgba(0,0,0,.28);
+    position: absolute; width: var(--note-w); border: 1px solid var(--line); text-align: left;
+    border-left: 3px solid var(--voice, var(--muted)); border-radius: var(--r-sm);
+    background: var(--stage-3); padding: 7px 10px 8px; z-index: 2; cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0,0,0,.28); transition: border-color .12s, transform .12s;
   }
+  .note:hover { border-color: color-mix(in srgb, var(--voice) 60%, var(--line)); transform: translateY(-1px); }
+  .note.sel { border-color: var(--brass-soft); border-left-color: var(--voice); box-shadow: 0 0 0 1px var(--brass-soft), 0 8px 20px rgba(0,0,0,.4); z-index: 4; }
   .note .top { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
-  .note .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--voice, var(--muted)); flex: none;
-    box-shadow: 0 0 8px var(--voice, transparent); }
-  .note .lab { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 1.4px;
-    color: var(--voice, var(--ivory)); }
-  .note .chip { margin-left: auto; font-family: var(--font-mono); font-size: 9px; color: var(--muted);
-    border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; max-width: 88px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .note .sum { font-family: var(--font-mono); font-size: 11px; line-height: 1.35; color: #d7cebf;
+  .note .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--voice, var(--muted)); flex: none; }
+  .note .lab { font-size: 11.5px; font-weight: 600; color: var(--voice, var(--ivory)); white-space: nowrap; }
+  .note .tm { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+  .note .sum { display: block; font-size: 12.5px; line-height: 1.3; color: var(--text-2);
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  /* Fitted down to show a whole run, a note is too narrow for both the id chip and
-     the summary — the chip degrades to "a." and tells you nothing. Drop it and give
-     the width back to the summary, which is the part that carries meaning. */
-  .score.compact .note .chip { display: none; }
-  .score.compact .note .sum { -webkit-line-clamp: 3; }
-  .score.compact .note .lab { font-size: 9px; letter-spacing: 1px; }
+  /* Fitted down to show a whole run, a note is too narrow for its header row. Drop it
+     (the edge colour still says which kind of step it is) and give the room to the
+     summary, which is the part that carries meaning. */
+  .score.compact .note { padding: 8px 8px 8px 9px; }
+  .score.compact .note .top { display: none; }
+  .score.compact .note .sum { font-size: 12px; -webkit-line-clamp: 3; }
   .note.enter { animation: strike .34s cubic-bezier(.2,.8,.2,1); }
   @keyframes strike { from { opacity: 0; transform: translateY(7px) scale(.97); } to { opacity: 1; transform: none; } }
 
@@ -192,102 +215,190 @@
   .arcs path { fill: none; stroke: var(--v-critic); stroke-width: 2; opacity: .9;
     stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw .7s ease forwards; }
   .arcs .cap { fill: var(--v-critic); }
-  .arcs text { fill: var(--v-critic); font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 1px; }
+  .arcs text { fill: var(--v-critic); font-family: var(--font-ui); font-size: 11px; font-weight: 600; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
 
-  /* z-index 1: above the lane rules, below the notes (2) — it marks time behind the
-     score rather than drawing a line through the note text. */
+  /* z-index 1: above the lane rules, below the notes — it marks time behind the score. */
   .playhead { position: absolute; top: 0; bottom: 0; width: 2px; z-index: 1; pointer-events: none;
     background: linear-gradient(180deg, transparent, var(--brass) 12%, var(--brass) 88%, transparent);
-    box-shadow: 0 0 14px 1px rgba(216,166,63,.5); transition: left .35s cubic-bezier(.3,.7,.3,1); opacity: 0; }
+    box-shadow: 0 0 14px 1px rgba(216,166,63,.45); transition: left .35s cubic-bezier(.3,.7,.3,1); opacity: 0; }
   .playhead.on { opacity: 1; }
   .playhead::before { content: ""; position: absolute; top: -1px; left: -4px; width: 10px; height: 10px;
     border-radius: 50%; background: var(--brass); box-shadow: 0 0 12px var(--brass); }
 
-  /* ---- ensemble (pre-run) ---- */
-  .ensemble { grid-area: 1 / 1 / 2 / -1; z-index: 5; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 20px; text-align: center; padding: 30px;
-    background: var(--stage-2); }
-  .ensemble p { color: var(--muted); margin: 0; font-size: 14px; max-width: 460px; }
-  .ensemble .players { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-  .player { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; }
-  .player .disc { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--voice);
-    background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--voice) 55%, transparent), transparent 70%); }
-  .player .pn { font-family: var(--font-mono); font-size: 11px; color: var(--ivory); }
-  .player .pr { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  /* ---- empty state ---- */
+  .intro { grid-area: 1 / 1 / 2 / -1; z-index: 5; padding: 30px 28px; background: var(--stage-2);
+    display: flex; flex-direction: column; gap: 22px; }
+  .intro h3 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 24px; }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
+  .steps li { counter-increment: s; border-top: 2px solid var(--v); padding-top: 12px; }
+  .steps li b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .steps li b::before { content: counter(s) "  "; color: var(--v); font-family: var(--font-mono); font-weight: 500; white-space: pre; }
+  .steps li p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+  .intro-cta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .intro-cta .hint { margin: 0; }
 
-  /* ---- finished score (final brief) ---- */
-  .coda { display: none; margin-top: 22px; border: 1px solid var(--line); border-radius: 5px;
-    background: var(--stage-2); padding: 22px 24px; }
-  .coda.show { display: block; }
-  .coda h3 { font-family: var(--font-display); font-weight: 400; font-size: 24px; margin: 0 0 4px; }
+  .legend { display: flex; gap: 8px 18px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .legend i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); display: inline-block; }
+  .legend i.arc { width: 16px; height: 2px; border-radius: 1px; }
+
+  /* ---- plan + step detail ---- */
+  .details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 16px; margin-top: 18px; }
+  .panel { background: var(--stage-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px 18px 18px; min-width: 0; }
+  .panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .panel h3 { margin: 0; font-size: 15px; font-weight: 600; }
+  .panel-head .sub { font-size: 12.5px; color: var(--muted); }
+  .planlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .pl-item { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 2px 10px; width: 100%;
+    text-align: left; background: none; border: 1px solid transparent; border-radius: var(--r-sm);
+    padding: 8px 8px; cursor: pointer; align-items: start; }
+  .pl-item:hover:not(:disabled) { background: var(--stage-3); }
+  .pl-item:disabled { cursor: default; }
+  .pl-item.on { border-color: var(--line); background: var(--stage-3); }
+  .pl-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--voice); margin-top: 6px; }
+  .pl-id { font-family: var(--font-mono); font-size: 12.5px; color: var(--ivory); }
+  .pl-desc { grid-column: 2; font-size: 13px; color: var(--text-2); line-height: 1.45; }
+  .pl-deps { grid-column: 2; font-size: 12px; color: var(--muted); }
+  .pl-st { font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+  .pl-st.done { color: var(--green); } .pl-st.running, .pl-st.retrying { color: var(--brass-soft); }
+  .pl-st.failed { color: var(--red); } .pl-st.rejected { color: var(--v-critic); } .pl-st.degraded { color: var(--amber); }
+
+  .stepper { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .stepper .pos { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 88px; text-align: center; }
+  .iconbtn { background: none; border: 1px solid var(--line); color: var(--text-2); width: 30px; height: 28px;
+    border-radius: var(--r-sm); cursor: pointer; font-size: 14px; line-height: 1; }
+  .iconbtn:hover:not(:disabled) { border-color: var(--brass); color: var(--ivory); }
+  .iconbtn:disabled { opacity: .35; cursor: default; }
+  .insp-kind { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--voice); }
+  .insp-kind i { width: 9px; height: 9px; border-radius: 50%; background: var(--voice); }
+  .insp-text { font-size: 17px; margin: 4px 0 14px; line-height: 1.4; }
+  .kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 7px 14px; margin: 0; font-size: 13.5px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; color: var(--text-2); overflow-wrap: anywhere; }
+  .kv dd code { color: var(--ivory); }
+  .empty-note { color: var(--muted); font-size: 13.5px; margin: 0; }
+  .follow { margin-top: 14px; }
+
+  /* ---- the brief ---- */
+  .coda { margin-top: 28px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--stage-2); padding: 24px 28px 26px; scroll-margin-top: 16px; }
   .coda-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .coda .copy { background: none; border: 1px solid var(--line); color: var(--muted);
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: .5px; padding: 5px 12px;
-    border-radius: 3px; cursor: pointer; white-space: nowrap; }
-  .coda .copy:hover:not(:disabled) { color: var(--ivory); border-color: var(--brass); }
-  .coda .copy:disabled { opacity: .4; cursor: default; }
-  .coda .copy:focus-visible { outline: 2px solid var(--brass-soft); outline-offset: 2px; }
+  .coda h2 { font-family: var(--font-display); font-weight: 400; font-size: 30px; margin: 0; line-height: 1.1; }
+  .copies { display: flex; gap: 8px; flex-wrap: wrap; }
   .coda .copy.done { color: var(--green); border-color: var(--green); }
   .coda .copy.failed { color: var(--amber); border-color: var(--amber); }
-  .coda .status-line { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; color: var(--muted);
-    text-transform: uppercase; margin-bottom: 14px; }
-  .coda .brief { line-height: 1.7; font-size: 15px; }
-  .coda .brief > :first-child { margin-top: 0; }
-  .coda .brief h2, .coda .brief h3, .coda .brief h4 { font-family: var(--font-display); font-weight: 400; line-height: 1.18; color: var(--ivory); margin: 20px 0 8px; }
-  .coda .brief h2 { font-size: 25px; }
-  .coda .brief h3 { font-size: 21px; }
-  .coda .brief h4 { font-size: 17px; letter-spacing: .3px; color: var(--brass-soft); }
-  .coda .brief p { margin: 10px 0; }
-  .coda .brief ul, .coda .brief ol { margin: 8px 0; padding-left: 22px; }
-  .coda .brief li { margin: 5px 0; }
-  .coda .brief li::marker { color: var(--brass); }
-  .coda .brief strong { color: var(--ivory); font-weight: 700; }
-  .coda .brief em { color: #e4dccd; }
-  .coda .brief code { font-family: var(--font-mono); font-size: 13px; background: var(--stage-3); padding: 1px 5px; border-radius: 3px; }
-  .coda .brief sup.cite { color: var(--brass); font-family: var(--font-mono); font-size: 10px; font-weight: 600; }
-  .coda .brief a { color: var(--v-researcher); }
-  .coda .flag { margin-top: 12px; color: var(--amber); font-size: 13px; font-family: var(--font-mono); }
-  .coda .sources { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-  .coda .sources .h { font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-  .coda .sources ul, .coda .sources ol { margin: 0; padding-left: 26px; color: #cfc6b8; font-family: var(--font-mono); font-size: 12.5px; }
-  .coda .sources li { margin: 3px 0; word-break: break-all; }
-  .coda .sources ol.numbered li::marker { color: var(--brass); font-weight: 600; }
-  /* Jumped-to source: brief highlight so a reviewer following [3] can see where it landed. */
-  .coda .sources li:target { background: rgba(216,166,63,.10); outline: 1px solid var(--brass);
-    outline-offset: 3px; border-radius: 2px; }
-  .coda .brief sup.cite a.cite-link { color: var(--brass); text-decoration: none; }
-  .coda .brief sup.cite a.cite-link:hover { text-decoration: underline; }
-  .coda .brief sup.cite a.cite-link:focus-visible { outline: 1px solid var(--brass-soft); outline-offset: 2px; }
-  .coda .sources a { color: var(--v-researcher); text-decoration: none; border-bottom: 1px solid transparent; }
-  .coda .sources a:hover { border-bottom-color: var(--v-researcher); }
-  .coda .sources a:focus-visible { outline: 2px solid var(--v-researcher); outline-offset: 2px; }
+  .coda .meta { font-size: 13px; color: var(--muted); margin: 6px 0 18px; }
+  .coda .flag { margin: 0 0 16px; padding: 10px 14px; border-left: 3px solid var(--amber); background: rgba(224,160,76,.08);
+    border-radius: var(--r-sm); color: var(--text-2); font-size: 13.5px; }
+  .coda .flag.err { border-left-color: var(--red); background: rgba(226,106,102,.08); }
+  .coda .flag:empty { display: none; }
+  /* Brief and sources side by side: the prose keeps a readable line length and the
+     sources fill the width beside it, staying in view while you read. */
+  .coda-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 40px; align-items: start; }
+  .coda-body.solo { grid-template-columns: minmax(0, 1fr); }
+  .brief { line-height: 1.7; font-size: 15.5px; max-width: 80ch; }
+  .brief > :first-child { margin-top: 0; }
+  .brief h2, .brief h3, .brief h4 { font-family: var(--font-display); font-weight: 400; line-height: 1.2; color: var(--ivory); margin: 26px 0 8px; }
+  .brief h2 { font-size: 25px; } .brief h3 { font-size: 21px; }
+  .brief h4 { font-size: 18px; color: var(--brass-soft); }
+  .brief p { margin: 10px 0; }
+  .brief ul, .brief ol { margin: 8px 0; padding-left: 22px; }
+  .brief li { margin: 5px 0; }
+  .brief li::marker { color: var(--brass); }
+  .brief strong { color: var(--ivory); font-weight: 700; }
+  .brief em { color: #e4dccd; }
+  .brief code { background: var(--stage-3); padding: 1px 5px; border-radius: 3px; }
+  .brief sup.cite { color: var(--brass); font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; }
+  .brief sup.cite a.cite-link { color: var(--brass); text-decoration: none; }
+  .brief sup.cite a.cite-link:hover { text-decoration: underline; }
+  .sources { position: sticky; top: 16px; padding: 14px 16px 16px; border: 1px solid var(--line);
+    border-radius: var(--r-md); background: var(--stage); max-height: calc(100vh - 32px); overflow-y: auto; }
+  .sources h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+  .sources ul, .sources ol { margin: 0; padding-left: 24px; color: var(--text-2); font-size: 13px; }
+  .sources li { margin: 0 0 10px; padding-left: 2px; }
+  .sources li:last-child { margin-bottom: 0; }
+  .sources ol li::marker { color: var(--brass); font-family: var(--font-mono); font-size: 12px; }
+  /* Jumped-to source: brief highlight so a reader following [3] can see where it landed. */
+  .sources li:target { background: rgba(216,166,63,.10); outline: 1px solid var(--brass); outline-offset: 3px; border-radius: 2px; }
+  .sources a { text-decoration: none; display: block; }
+  .sources a:hover .host { text-decoration: underline; }
+  .sources .host { display: block; color: var(--v-researcher); font-weight: 500; overflow-wrap: anywhere; }
+  .sources .path { display: block; color: var(--muted); font-family: var(--font-mono); font-size: 11.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sources .plain { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
 
-  /* ---- repertoire (past runs) ---- */
-  .repertoire { margin-top: 40px; }
-  .repertoire h2 { font-family: var(--font-display); font-weight: 400; font-size: 24px; margin: 0 0 4px; }
-  .repertoire .sub { color: var(--muted); font-size: 12px; font-family: var(--font-mono); margin-bottom: 14px; }
-  .repertoire .sub button { background: none; border: 1px solid var(--line); color: var(--muted);
-    font-family: var(--font-mono); font-size: 10px; padding: 3px 10px; border-radius: 2px; cursor: pointer; margin-left: 8px; }
-  .repertoire .sub button:hover { color: var(--ivory); border-color: var(--brass); }
-  .runlist { display: flex; flex-direction: column; gap: 7px; }
-  .runitem { display: flex; gap: 14px; align-items: center; padding: 11px 15px; cursor: pointer;
-    background: var(--stage-2); border: 1px solid var(--line); border-radius: 4px; }
-  .runitem:hover { border-color: var(--brass); }
-  .runitem .st { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; letter-spacing: 1px;
-    text-transform: uppercase; padding: 3px 9px; border-radius: 10px; border: 1px solid var(--line); }
-  .runitem .st.completed { color: var(--green); } .runitem .st.degraded { color: var(--amber); }
-  .runitem .st.halted, .runitem .st.error { color: var(--red); }
-  .runitem .g { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-  .runitem .meta { color: var(--muted); font-size: 11px; font-family: var(--font-mono); white-space: nowrap; }
-  .empty { color: var(--muted); font-size: 13px; font-family: var(--font-mono); }
+  /* ---- thread + follow-up ---- */
+  .thread { margin: 0 0 20px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--stage); }
+  .thread h3 { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
+  .thread ol { margin: 0; padding-left: 22px; font-size: 14px; }
+  .thread li { margin: 3px 0; }
+  .thread li::marker { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
+  .thread li[aria-current="true"] { color: var(--ivory); font-weight: 500; }
+  .thread li[aria-current="true"]::after { content: "  (this brief)"; color: var(--muted); font-weight: 400; font-size: 12.5px; white-space: pre; }
+  .linkbtn { background: none; border: 0; padding: 0; color: var(--v-researcher); cursor: pointer; font-size: inherit; text-align: left; }
+  .linkbtn:hover { text-decoration: underline; }
+  .fu { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); scroll-margin-top: 120px; }
+  .fu-label { display: block; font-family: var(--font-display); font-size: 24px; line-height: 1.1; margin-bottom: 12px; }
+  .fu .hint { margin-top: 10px; }
+  .thread-note { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 12px 0 0; padding: 9px 12px; font-size: 13px;
+    color: var(--text-2); border-left: 3px solid var(--v-memory); background: rgba(166,151,212,.08); border-radius: var(--r-sm); }
+  .kv ul { margin: 0; padding-left: 18px; } .kv li { margin: 2px 0; }
 
+  /* ---- past runs ---- */
+  .history { margin-top: 44px; }
+  .history-head { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; margin-bottom: 12px; }
+  .history h2 { font-family: var(--font-display); font-weight: 400; font-size: 28px; margin: 0; line-height: 1.1; }
+  .history-head p { margin: 0; color: var(--muted); font-size: 13px; flex: 1 1 240px; }
+  .runlist { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: var(--stage-2); }
+  .runlist li + li { border-top: 1px solid var(--line-soft); }
+  .run-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%;
+    padding: 12px 16px; background: none; border: 0; text-align: left; cursor: pointer; }
+  .run-row:hover { background: var(--stage-3); }
+  .run-row[aria-current="true"] { background: var(--stage-3); box-shadow: inset 3px 0 0 var(--brass); }
+  .run-row .d { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+  .run-row .d.degraded { background: var(--amber); } .run-row .d.halted, .run-row .d.error { background: var(--red); }
+  /* A follow-up hangs off the run it continues, joined by an elbow. */
+  .run-row.fu-row { position: relative; padding-left: 44px; }
+  .run-row.fu-row::before { content: ""; position: absolute; left: 20px; top: -1px; height: 50%; width: 14px;
+    border-left: 1px solid var(--muted); border-bottom: 1px solid var(--muted); border-bottom-left-radius: 5px; opacity: .6; }
+  .runlist li.cont { border-top-color: transparent; }
+  .run-row .g { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .run-row.fu-row .g { font-size: 14px; color: var(--text-2); }
+  .run-row .g small { color: var(--amber); font-size: 12.5px; margin-left: 8px; }
+  .run-row .m { font-size: 12.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .history .more { margin-top: 10px; }
+  .history .empty-note { padding: 14px 16px; }
+
+  @media (max-width: 960px) {
+    .coda-body { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .sources { position: static; max-height: none; }
+  }
+  @media (max-width: 860px) {
+    .details { grid-template-columns: 1fr; }
+    .mark { font-size: 72px; }
+    .lede { padding-left: 0; border-left: 0; flex-basis: 100%; }
+    .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
   @media (max-width: 640px) {
-    .mark { font-size: 46px; } .tagline { display: none; }
-    .score { grid-template-columns: 112px 1fr; } :root { --beat-w: 176px; --note-w: 156px; }
+    .wrap { padding: 20px 16px 64px; }
+    .mark { font-size: 58px; } .lede { font-size: 14.5px; }
+    .ask { padding: 16px 14px 14px; }
+    .ask-row .primary { width: 100%; }
+    :root { --gutter-w: 108px; --beat-w: 176px; --note-w: 160px; }
+    .lane-label { padding: 0 8px 0 12px; } .lane-label .nm { font-size: 13px; }
+    .stages { grid-template-columns: repeat(5, minmax(56px, 1fr)); overflow-x: auto; }
+    .stage .sd { font-size: 11.5px; }
+    .steps { grid-template-columns: 1fr; }
+    .intro { padding: 22px 18px; }
+    .coda { padding: 20px 18px; }
+    .kv { grid-template-columns: 1fr; gap: 2px; } .kv dd { margin-bottom: 8px; }
+    .run-row { grid-template-columns: 10px minmax(0, 1fr); }
+    .run-row .m { grid-column: 2; }
+    .rb-actions { margin-left: 0; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .note.enter, .arcs path { animation: none; } .playhead { transition: none; }
+    .note.enter, .arcs path, .pill.running::before, .stage.active .bar, .waking .pulse { animation: none; }
+    .playhead, .note { transition: none; }
     .canvas-wrap { scroll-behavior: auto; } .arcs path { stroke-dashoffset: 0; }
   }
 </style>
@@ -295,85 +406,160 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="brand">
-      <span class="mark">Maestro</span>
-      <span class="baton">a conductor's score</span>
-    </div>
-    <div class="tagline">A supervisor <b>conducts</b> role-specialized agents through a goal — decompose, delegate in parallel, critique, recover. Watch the coordination <b>play</b>.</div>
+    <h1 class="mark">Maestro</h1>
+    <p class="lede">Ask a question that needs research. A supervisor agent splits it into subtasks, researchers gather evidence in parallel, a critic checks the analysis, and a writer turns it into a cited brief. You watch every hand-off.</p>
   </header>
-  <div class="rule"></div>
 
-  <div class="commission">
-    <div class="field"><label>the goal</label>
-      <input id="goal" type="text" placeholder="Compare X and Y for Z, and recommend one." /></div>
-    <div class="field" id="thread"><label>thread</label>
-      <input id="threadin" type="text" placeholder="optional" /></div>
-    <button class="conduct" id="run">Conduct&nbsp;▸</button>
-  </div>
-  <div class="examples" id="examples"></div>
-
-  <div class="modelbar" id="modelbar">
-    <span class="mlabel">model</span>
-    <div class="seg">
-      <button class="segbtn active" id="seg-default">primary</button>
-      <button class="segbtn" id="seg-fallback">lite</button>
+  <section class="ask" aria-label="Start a run">
+    <label class="ask-label" for="goal">What should the agents research?</label>
+    <div class="ask-row">
+      <input id="goal" type="text" autocomplete="off" placeholder="Compare X and Y for Z, and recommend one." />
+      <button class="primary" id="run" type="button">Run agents</button>
     </div>
-    <span class="mnote" id="mnote"></span>
-  </div>
+    <div class="examples" id="examples"><span class="try">Try</span></div>
+    <p class="thread-note" id="thread-note" hidden>
+      <span>New runs continue thread <code id="thread-note-id"></code> and can use its memory.</span>
+      <button class="linkbtn" id="thread-clear" type="button">Start a new thread instead</button>
+    </p>
 
-  <div class="keyctl"><span class="keytoggle" id="keytoggle">🔑 use your own key</span></div>
-  <div class="keyrow" id="keyrow">
-    <div class="field"><label>gemini api key</label>
-      <input id="keyin" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…  ·  optional, runs on your quota" /></div>
-    <span class="keynote">stays in your browser · sent only to this server · never stored or logged · <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">get a free key ↗</a></span>
-    <span id="keymsg"></span>
-  </div>
+    <details class="options" id="options">
+      <summary><b>Options</b> <span id="opt-summary"></span></summary>
+      <div class="opt-grid">
+        <div class="opt" id="model-opt" hidden>
+          <span class="opt-name" id="model-name">Model</span>
+          <div class="seg" role="group" aria-labelledby="model-name">
+            <button class="segbtn" id="seg-default" type="button" aria-pressed="true">primary</button>
+            <button class="segbtn" id="seg-fallback" type="button" aria-pressed="false">fallback</button>
+          </div>
+          <p class="hint">Each model has its own free daily quota. If one is used up, switch to the other.</p>
+          <p class="warn" id="mnote"></p>
+        </div>
+        <div class="opt">
+          <label for="threadin">Thread</label>
+          <input id="threadin" type="text" autocomplete="off" spellcheck="false" placeholder="Leave empty to start fresh" />
+          <p class="hint">Runs in the same thread share memory, so a follow-up question builds on what earlier runs found.</p>
+        </div>
+        <div class="opt">
+          <label for="keyin" id="key-label">Your Gemini API key (optional)</label>
+          <input id="keyin" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" />
+          <p class="hint">Runs on your own quota instead of the shared free tier. Sent with this run only; never stored or logged. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free key</a></p>
+          <p class="warn" id="keymsg"></p>
+        </div>
+      </div>
+    </details>
+  </section>
 
-  <div class="waking" id="waking">
+  <div class="waking" id="waking" role="status">
     <span class="pulse"></span>
-    <span class="wt" id="waking-text">warming the orchestra… <b id="waking-secs">0s</b></span>
-    <span class="wn" id="waking-note">the free tier sleeps after 15 min idle</span>
+    <span class="wt" id="waking-text">Starting the server… <b id="waking-secs">0s</b></span>
+    <span class="wn" id="waking-note">The free host sleeps after 15 minutes idle. Waking it takes about a minute.</span>
   </div>
 
-  <div class="tempo" id="tempo">
-    <div class="m"><b id="t-status">—</b><small>movement</small></div>
-    <div class="m"><b id="t-subtasks">0</b><small>voices</small></div>
-    <div class="m"><b id="t-critic">0</b><small>critic passes</small></div>
-    <div class="m"><b id="t-recover">0</b><small>recoveries</small></div>
-    <div class="m"><b id="t-run" style="color:var(--muted);font-size:12px">—</b><small>run</small></div>
-  </div>
+  <section class="runbar" id="runbar" hidden aria-label="Run status">
+    <div class="rb-top">
+      <span class="pill running" id="st-pill" role="status" aria-live="polite">Running</span>
+      <span class="rb-fact" id="st-time"></span>
+      <span class="rb-goal" id="st-goal"></span>
+      <div class="rb-actions">
+        <button class="ghost" id="followup" type="button" hidden>Ask a follow-up</button>
+        <button class="ghost" id="playback" type="button" hidden>Play again</button>
+        <a class="ghost" id="to-brief" href="#coda" hidden>Read the brief</a>
+      </div>
+    </div>
+    <ol class="stages" id="stages"></ol>
+  </section>
 
-  <div class="score-title"><h2>The score</h2><span id="score-hint">one stave per agent · time flows right · brass = the conductor</span></div>
+  <div class="score-head">
+    <h2>Timeline</h2>
+    <p id="score-hint">Each row is an agent; time runs left to right.</p>
+  </div>
   <div class="score" id="score">
     <div class="gutter" id="gutter"></div>
     <div class="canvas-wrap" id="cwrap">
       <div class="canvas" id="canvas">
-        <svg class="arcs" id="arcs"></svg>
+        <svg class="arcs" id="arcs" aria-hidden="true"></svg>
         <div class="playhead" id="playhead"></div>
       </div>
     </div>
-    <div class="ensemble" id="ensemble">
-      <div class="players" id="players"></div>
-      <p>Give Maestro a goal and press <b style="color:var(--brass)">Conduct</b>. The supervisor decomposes it at runtime and delegates to each voice; independent research plays in parallel, the critic can send work back, and failures recover in the open.</p>
+    <div class="intro" id="intro">
+      <h3>What happens when you run it</h3>
+      <ol class="steps">
+        <li style="--v: var(--v-supervisor)"><b>Plan</b><p>The supervisor splits your question into subtasks and decides which ones wait on others.</p></li>
+        <li style="--v: var(--v-researcher)"><b>Research</b><p>Researcher agents gather evidence, two at a time. A failed search is retried, then handed to a fresh researcher.</p></li>
+        <li style="--v: var(--v-critic)"><b>Draft and review</b><p>The analyst drafts a comparison. The critic approves it or sends it back with feedback.</p></li>
+        <li style="--v: var(--v-writer)"><b>Write</b><p>The writer turns the approved analysis into a brief with numbered sources.</p></li>
+      </ol>
+      <div class="intro-cta">
+        <button class="ghost" id="watch" type="button" hidden>Watch a recorded run</button>
+        <p class="hint" id="watch-hint" hidden>Replays a past run step by step. Uses no API quota.</p>
+      </div>
     </div>
   </div>
+  <div class="legend" id="legend" hidden>
+    <span><i style="--c: var(--green)"></i>Approved</span>
+    <span><i class="arc" style="--c: var(--v-critic)"></i>Sent back for revision</span>
+    <span><i style="--c: var(--amber)"></i>Recovery or skipped</span>
+    <span><i style="--c: var(--v-memory)"></i>Memory</span>
+    <span>Select any step for details, or use the ← → keys.</span>
+  </div>
 
-  <div class="coda" id="coda">
+  <div class="details" id="details" hidden>
+    <section class="panel" aria-labelledby="plan-h">
+      <div class="panel-head"><h3 id="plan-h">Plan</h3><span class="sub" id="plan-sub"></span></div>
+      <ol class="planlist" id="planlist"></ol>
+    </section>
+    <section class="panel" aria-labelledby="insp-h">
+      <div class="panel-head">
+        <h3 id="insp-h">Step details</h3>
+        <div class="stepper">
+          <button class="iconbtn" id="prev" type="button" aria-label="Previous step">←</button>
+          <span class="pos" id="insp-pos"></span>
+          <button class="iconbtn" id="next" type="button" aria-label="Next step">→</button>
+        </div>
+      </div>
+      <div id="insp-body"><p class="empty-note">Select a step on the timeline.</p></div>
+      <button class="ghost follow" id="follow" type="button" hidden>Jump to latest step</button>
+    </section>
+  </div>
+
+  <section class="coda" id="coda" hidden aria-labelledby="coda-h">
     <div class="coda-head">
-      <h3>The finished score</h3>
-      <button class="copy" id="copy-brief" type="button">copy brief</button>
+      <h2 id="coda-h">Brief</h2>
+      <div class="copies">
+        <button class="ghost copy" id="copy-brief" type="button">Copy brief</button>
+        <button class="ghost copy" id="copy-thread" type="button" hidden>Copy thread</button>
+      </div>
     </div>
-    <div class="status-line" id="coda-status"></div>
-    <div class="brief" id="coda-brief"></div>
-    <div class="flag" id="coda-flag"></div>
-    <div class="sources" id="coda-sources" style="display:none"></div>
-  </div>
+    <p class="meta" id="coda-meta"></p>
+    <p class="flag" id="coda-flag"></p>
+    <nav class="thread" id="thread" hidden aria-labelledby="thread-h">
+      <h3 id="thread-h">In this thread</h3>
+      <ol id="thread-list"></ol>
+    </nav>
+    <div class="coda-body" id="coda-body">
+      <div class="brief" id="coda-brief"></div>
+      <aside class="sources" id="coda-sources" hidden aria-label="Sources"></aside>
+    </div>
+    <div class="fu" id="fu" hidden>
+      <label class="fu-label" for="fu-in">Ask a follow-up</label>
+      <div class="ask-row">
+        <input id="fu-in" type="text" autocomplete="off" placeholder="What would change this recommendation?" />
+        <button class="primary" id="fu-run" type="button">Ask</button>
+      </div>
+      <div class="examples" id="fu-suggest"><span class="try">Try</span></div>
+      <p class="hint" id="fu-hint"></p>
+    </div>
+  </section>
 
-  <div class="repertoire">
-    <h2>Repertoire</h2>
-    <div class="sub">past performances — click to replay<button id="refresh">refresh</button></div>
-    <div class="runlist" id="runlist"><div class="empty">Nothing performed yet.</div></div>
-  </div>
+  <section class="history" aria-labelledby="history-h">
+    <div class="history-head">
+      <h2 id="history-h">Past runs</h2>
+      <p>Open one to see its timeline and brief. Nothing is re-run.</p>
+      <button class="ghost" id="refresh" type="button">Refresh</button>
+    </div>
+    <ul class="runlist" id="runlist"><li><p class="empty-note">No runs yet.</p></li></ul>
+    <button class="ghost more" id="more" type="button" hidden></button>
+  </section>
 </div>
 
 <!-- Optional: sets window.MAESTRO_API when the viewer is hosted apart from the API.
@@ -388,34 +574,91 @@ const API = (new URLSearchParams(location.search).get("api") || window.MAESTRO_A
 const api = (path) => API + path;
 
 const EXAMPLES = [
-  "Compare solar and wind energy for grid reliability, and recommend one.",
-  "Should a startup use PostgreSQL or MongoDB for its first product?",
-  "Compare REST and GraphQL for a public API and recommend one.",
+  ["Solar vs. wind for grid reliability", "Compare solar and wind energy for grid reliability, and recommend one."],
+  ["PostgreSQL vs. MongoDB for a startup", "Should a startup use PostgreSQL or MongoDB for its first product?"],
+  ["REST vs. GraphQL for a public API", "Compare REST and GraphQL for a public API and recommend one."],
 ];
 const VOICE = { supervisor: "--v-supervisor", researcher: "--v-researcher", analyst: "--v-analyst",
   critic: "--v-critic", writer: "--v-writer" };
-const LABEL = { run_started:"RAISE", plan_produced:"SCORE", plan_replanned:"RESCORE",
-  subtask_dispatched:"CUE", subagent_result:"PLAY", critic_pass:"PASS", critic_reject:"REJECT",
-  recovery:"RECOVER", rate_limit_backoff:"HOLD", degraded:"MUTE", memory_recall:"RECALL",
-  memory_write:"STORE", halted:"HALT", completed:"CODA", error:"ERROR" };
-const OVERRIDE = { critic_pass:"--green", critic_reject:"--v-critic", recovery:"--amber",
-  rate_limit_backoff:"--amber", degraded:"--amber", halted:"--red", error:"--red",
-  completed:"--brass", memory_recall:"--v-memory", memory_write:"--v-memory" };
-const ENSEMBLE = [["supervisor","conductor"],["researcher","strings"],["researcher","strings"],
-  ["analyst","woodwind"],["critic","reed"],["writer","brass"]];
+const ROLE = { supervisor: ["Supervisor", "Plans and delegates"], researcher: ["Researcher", "Gathers evidence"],
+  analyst: ["Analyst", "Drafts the analysis"], critic: ["Critic", "Reviews the draft"], writer: ["Writer", "Writes the brief"] };
+const KIND_LABEL = { run_started: "Start", plan_produced: "Plan", plan_replanned: "New plan",
+  subtask_dispatched: "Dispatched", subagent_result: "Output", critic_pass: "Approved", critic_reject: "Sent back",
+  recovery: "Recovery", degraded: "Skipped", memory_recall: "Memory", memory_write: "Memory",
+  halted: "Halted", completed: "Finished", error: "Error" };
+const OVERRIDE = { critic_pass: "--green", critic_reject: "--v-critic", recovery: "--amber",
+  degraded: "--amber", halted: "--red", error: "--red", completed: "--brass",
+  memory_recall: "--v-memory", memory_write: "--v-memory" };
+const STAGES = [["Plan", "--v-supervisor"], ["Research", "--v-researcher"], ["Draft", "--v-analyst"],
+  ["Review", "--v-critic"], ["Write", "--v-writer"]];
+const STAGE_OF = { researcher: 1, analyst: 2, critic: 3, writer: 4 };
+const STATUS_TEXT = { running: "Running", replaying: "Replaying", completed: "Completed",
+  degraded: "Completed with gaps", halted: "Stopped at a limit", error: "Failed" };
+const SUB_STATUS = { pending: "Waiting", running: "Working", done: "Done", failed: "Failed",
+  retrying: "Retrying", rejected: "Sent back", degraded: "Skipped" };
 
 const $ = (id) => document.getElementById(id);
 const cwrap = $("cwrap"), canvas = $("canvas"), gutter = $("gutter"), arcs = $("arcs"), playhead = $("playhead");
 const cssv = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const kindOf = (ev) => ev.type || ev.event_type;
+const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : s;
+function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+// esc() escapes & < > but not quotes, which is fine for text nodes and unsafe inside
+// an attribute — a value containing a double quote would break out of href="…".
+const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
 
-// model selection — primary vs the higher-throughput fallback (for when the free tier throttles)
-let MODELS = { default: null, fallback: null }, currentModel = null;
+function fmtDur(ms) {
+  if (!isFinite(ms) || ms < 0) return "";
+  const s = Math.round(ms / 1000);
+  if (ms < 1000) return "under 1s";
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+}
+function ago(iso) {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (!isFinite(s)) return "";
+  if (s < 60) return "just now";
+  const m = Math.round(s / 60); if (m < 60) return `${m} min ago`;
+  const h = Math.round(s / 3600); if (h < 24) return `${h} h ago`;
+  const d = Math.round(s / 86400); if (d < 7) return d === 1 ? "yesterday" : `${d} days ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+const idsIn = (s) => { const m = String(s || "").match(/\[(.*)\]/); return m ? m[1].split(",").map((x) => x.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean) : []; };
+
+// --- model selection + options ----------------------------------------------
+// primary vs the alternative model (each has its own free-tier daily quota)
+let MODELS = { default: null, fallback: null }, currentModel = null, keyRequired = false;
 const shortModel = (id) => (id ? id.replace(/^gemini-/, "") : "—");
 function setModel(role) {
   currentModel = role === "fallback" ? MODELS.fallback : MODELS.default;
-  $("seg-default").classList.toggle("active", role === "default");
-  $("seg-fallback").classList.toggle("active", role === "fallback");
+  $("seg-default").setAttribute("aria-pressed", role !== "fallback");
+  $("seg-fallback").setAttribute("aria-pressed", role === "fallback");
+  optSummary();
 }
+function optSummary() {
+  const parts = [];
+  if (currentModel) parts.push(shortModel(currentModel));
+  const t = $("threadin").value.trim(); if (t) parts.push("thread " + t);
+  if ($("keyin").value.trim()) parts.push("your key");
+  else if (keyRequired) parts.push("API key needed");
+  $("opt-summary").textContent = parts.join(", ");
+  // A thread typed into Options silently changes what the next run remembers; say so
+  // next to the Run button, where it matters, not only inside the collapsed options.
+  $("thread-note").hidden = !t;
+  $("thread-note-id").textContent = t;
+}
+
+// A follow-up carries its thread's opening question in the goal itself. Every agent
+// (and the memory lookup, which matches on words) then knows what "the recommended
+// option" refers to; the viewer unpacks it again for display.
+const FOLLOW_UP = /^Follow-up to "([\s\S]+?)": ([\s\S]+)$/;
+function parseGoal(g) {
+  const m = String(g || "").match(FOLLOW_UP);
+  return m ? { question: m[2], root: m[1] } : { question: String(g || ""), root: null };
+}
+const followUpGoal = (root, q) => `Follow-up to "${root}": ${q}`;
+const FOLLOW_UPS = ["What would change this recommendation?", "What are the biggest risks of the recommended option?",
+  "What would it cost to switch later?"];
 async function loadModels() {
   try {
     MODELS = await (await fetch(api("/models"))).json();
@@ -423,59 +666,59 @@ async function loadModels() {
     $("seg-default").textContent = shortModel(MODELS.default);
     $("seg-fallback").textContent = shortModel(MODELS.fallback);
     $("seg-default").title = MODELS.default; $("seg-fallback").title = MODELS.fallback;
-    if (MODELS.switchable && MODELS.fallback && MODELS.fallback !== MODELS.default)
-      $("modelbar").style.display = "flex";
+    $("model-opt").hidden = !(MODELS.switchable && MODELS.fallback && MODELS.fallback !== MODELS.default);
     if (MODELS.has_server_key === false) {  // server has no key -> the visitor must bring one
       keyRequired = true;
-      $("keytoggle").textContent = "🔑 API key required";
-      $("keyin").placeholder = "AIza…  ·  required — this server has no key of its own";
-      toggleKey(true);
+      $("key-label").textContent = "Your Gemini API key (required)";
+      $("keyin").placeholder = "AIza…  This server has no key of its own";
+      showKey();
     }
+    optSummary();
   } catch (_) { /* server starting */ }
+}
+function showKey(msg) {
+  $("options").open = true;
+  if (msg !== undefined) $("keymsg").textContent = msg;
+  $("keyin").focus();
 }
 $("seg-default").onclick = () => { setModel("default"); $("mnote").textContent = ""; };
 $("seg-fallback").onclick = () => { setModel("fallback"); $("mnote").textContent = ""; };
+$("threadin").addEventListener("input", optSummary);
+$("keyin").addEventListener("input", () => { $("keymsg").textContent = ""; optSummary(); });
 
-// bring-your-own-key
-let keyRequired = false;
-function toggleKey(force) {
-  const kr = $("keyrow");
-  const show = force === undefined ? !kr.classList.contains("show") : force;
-  kr.classList.toggle("show", show);
-  if (show) $("keyin").focus();
-}
-$("keytoggle").onclick = () => { $("keymsg").textContent = ""; toggleKey(); };
-
-let lanes, laneMap, beat, prevKey, notes, pendingReject, laneCount, silence, arcPairs;
-// live tallies — the tempo readout used to sit at 0 until the final frame, which
-// made an obviously-busy run look idle. These count as the events arrive; showFinal
-// then overwrites them with the server's authoritative numbers.
-let liveSubtasks, liveCritic, liveRecover;
-const PAD_X = 22, PAD_Y = 10, NOTE_H = 56;
+// --- the score -----------------------------------------------------------------
+let lanes, laneMap, beat, prevKey, notes, pendingReject, laneCount, arcPairs, silence;
+let plan = new Map();          // subtask id -> {id, role, description, depends_on, status}
+let stage;                     // live tallies behind the stage strip
+let run = null;                // what is on screen: {mode, goal, t0, firstTs, threadId, runId, rec}
+let selected = -1, follow = true;
+let clock, playToken = 0;
+const PAD_X = 22, PAD_Y = 9, NOTE_H = 60;
 
 // heartbeat: if the model goes quiet (e.g. rate-limit backoff inside one node),
-// say so instead of leaving a dead "playing…".
+// say so instead of leaving a dead "Running".
 function pokeSilence(active) {
   clearTimeout(silence);
-  if (!active) return;
-  $("t-status").textContent = "playing…"; $("t-status").style.color = "var(--ivory)";
-  silence = setTimeout(() => {
-    $("t-status").textContent = "backing off…"; $("t-status").style.color = "var(--amber)";
-  }, 5000);
+  if (!active || !run || run.mode !== "live") return;
+  setPill("running");
+  silence = setTimeout(() => setPill("running", "Waiting on the model…"), 6000);
 }
-
-// A retry does not get a note on the score; it updates the movement readout, which is
-// where "this is waiting, not broken" belongs. Named so the supervisor's own lane
-// stays about coordination.
+// A retry does not get a note on the score; it updates the status pill, which is
+// where "this is waiting, not broken" belongs.
 function noteBackoff(ev) {
   clearTimeout(silence);
   const n = ev.rate_limit_retry;
-  $("t-status").textContent = n ? `retrying ${n}…` : "backing off…";
-  $("t-status").style.color = "var(--amber)";
+  setPill("running", n ? `Rate limited, retry ${n}…` : "Waiting on the model…");
 }
+function setPill(state, text) {
+  const p = $("st-pill");
+  p.className = "pill " + (state === "replaying" ? "running" : state);
+  p.textContent = text || STATUS_TEXT[state] || cap(state);
+}
+
 const LANE_H = () => parseInt(cssv("--lane-h"));
 // Horizontal scale. 1 while playing (full-size notes, the score scrolls to follow the
-// playhead); shrunk on finish so the whole performance fits — see fitScore().
+// playhead); shrunk on finish so the whole run fits — see fitScore().
 let scale = 1;
 const MIN_SCALE = 0.5;  // below this the summaries stop being readable; scroll instead
 const BASE_BEAT = () => parseInt(cssv("--beat-w")), BASE_NOTE = () => parseInt(cssv("--note-w"));
@@ -489,8 +732,7 @@ function relayout() {
   arcs.innerHTML = "";
   for (const [from, to] of arcPairs) drawArc(from, to, true);
   extendCanvas();
-  const px = PAD_X + beat * BEAT_W() + NOTE_W() / 2;
-  playhead.style.left = px + "px";
+  if (notes[selected]) placePlayhead(notes[selected]);
 }
 
 // On finish, scale the score down until the entire run is visible at once. Without
@@ -499,12 +741,10 @@ function relayout() {
 function fitScore() {
   if (!notes.length) return;
   const avail = cwrap.clientWidth - PAD_X * 2;
-  // Match extendCanvas()'s width exactly — it reserves a full beat past the last
-  // note, so sizing against the notes alone leaves the score fractionally scrollable
-  // even when it looked like it should fit.
+  // Match extendCanvas()'s width exactly — it reserves a full beat past the last note.
   const needed = (beat + 1) * BASE_BEAT() + Math.max(0, BASE_NOTE() - BASE_BEAT());
   scale = Math.max(MIN_SCALE, Math.min(1, avail / needed));
-  $("score").classList.toggle("compact", scale < 0.78);
+  $("score").classList.toggle("compact", scale < 0.8);
   relayout();
   cwrap.scrollLeft = 0;
 }
@@ -514,23 +754,21 @@ function voiceFor(kind, agent) {
   return cssv(VOICE[agent] || "--muted") || cssv("--muted");
 }
 function laneKey(ev) {
-  const kind = ev.type || ev.event_type, agent = ev.agent || "", sid = ev.subtask_id;
-  if (agent === "researcher" && sid) return { key: "r:" + sid, nm: sid, rl: "researcher", agent: "researcher" };
+  const kind = kindOf(ev), agent = ev.agent || "", sid = ev.subtask_id;
+  if (agent === "researcher" && sid) return { key: "r:" + sid, nm: sid, rl: "Researcher", agent: "researcher", isId: true };
   if ((kind === "recovery" || kind === "degraded") && sid && laneMap["r:" + sid])
-    return { key: "r:" + sid, nm: sid, rl: "researcher", agent: "researcher" };
-  const nm = agent ? agent[0].toUpperCase() + agent.slice(1) : "system";
-  const rl = { supervisor: "conductor", analyst: "synthesis", critic: "review", writer: "compose" }[agent] || "voice";
-  return { key: "role:" + agent, nm, rl, agent };
+    return { key: "r:" + sid, nm: sid, rl: "Researcher", agent: "researcher", isId: true };
+  const r = ROLE[agent];
+  return { key: "role:" + agent, nm: r ? r[0] : (cap(agent) || "System"), rl: r ? r[1] : "", agent };
 }
 function ensureLane(info) {
   if (laneMap[info.key]) return laneMap[info.key];
   const idx = laneCount++;
   const lane = { ...info, idx };
   laneMap[info.key] = lane; lanes.push(lane);
-  const v = cssv(VOICE[info.agent] || "--muted");
   const lbl = document.createElement("div");
-  lbl.className = "lane-label"; lbl.style.setProperty("--voice", v);
-  lbl.innerHTML = `<div class="nm">${esc(info.nm)}</div><div class="rl">${esc(info.rl)}</div>`;
+  lbl.className = "lane-label"; lbl.style.setProperty("--voice", cssv(VOICE[info.agent] || "--muted"));
+  lbl.innerHTML = `<div class="nm${info.isId ? " id" : ""}" title="${escAttr(info.nm)}">${esc(info.nm)}</div><div class="rl">${esc(info.rl)}</div>`;
   gutter.appendChild(lbl);
   const rule = document.createElement("div");
   rule.className = "lane-rule"; rule.style.top = (idx * LANE_H()) + "px";
@@ -539,84 +777,105 @@ function ensureLane(info) {
   canvas.style.height = h + "px"; gutter.style.minHeight = h + "px";
   return lane;
 }
-function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
-// esc() escapes & < > but not quotes, which is fine for text nodes and unsafe inside
-// an attribute — a value containing a double quote would break out of href="…".
-const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
 
-// Citations are model output. Linkify only http(s) — anything else (a local corpus id
-// like "src_solar", or a javascript: URL) stays inert text.
-function citation(c) {
-  const s = String(c == null ? "" : c).trim();
-  if (!/^https?:\/\//i.test(s)) return esc(s);
-  return `<a href="${escAttr(s)}" target="_blank" rel="noopener noreferrer">${esc(s)}</a>`;
+// The trace summaries are written for logs ("research_1 -> done"). Say what happened
+// in words instead; the raw text stays one click away in the step details.
+function humanize(ev) {
+  const k = kindOf(ev), a = ev.agent || "", s = String(ev.summary || "");
+  let m;
+  switch (k) {
+    case "run_started": return ev.model ? `Started on ${shortModel(ev.model)}` : "Run started";
+    case "plan_produced": case "plan_replanned": {
+      const n = (ev.plan || (ev.data && ev.data.plan) || idsIn(s)).length;
+      return n ? `Split the question into ${n} subtasks` : s;
+    }
+    case "subtask_dispatched":
+      if (a === "supervisor") return "Reading the question and planning";
+      if ((m = s.match(/recover\(([^)]+)\)/))) return m[1] === "retry" ? "Trying the search again" : "Handed to a fresh researcher";
+      return "Started searching";
+    case "subagent_result":
+      if (a === "researcher") return /failed/.test(s) ? "Search failed" : "Found evidence";
+      if (a === "analyst" && (m = s.match(/rev (\d+)/))) return +m[1] === 0 ? "Wrote the first draft" : `Revised the draft (version ${+m[1] + 1})`;
+      if (a === "writer") return "Wrote the final brief";
+      return s;
+    case "critic_pass": m = s.match(/review (\d+)/); return m ? `Review ${m[1]}: good to go` : "Approved the draft";
+    case "critic_reject": m = s.match(/review (\d+)/); return m ? `Review ${m[1]}: needs revision` : "Sent the draft back";
+    case "recovery": m = s.match(/attempt (\d+) \(([^)]+)\)/); return m ? `Recovery attempt ${m[1]}: ${m[2]}` : s;
+    case "degraded": return "Gave up on this search; continuing without it";
+    case "memory_write": m = s.match(/stored (\d+)/); return m ? `Saved ${m[1]} findings for follow-ups` : s;
+    case "memory_recall": m = s.match(/recalled (\d+)/); return m ? `Recalled ${m[1]} finding${+m[1] === 1 ? "" : "s"} from earlier in the thread` : s;
+    case "completed": m = s.match(/\((\w+)\)\s*$/); return m ? (STATUS_TEXT[m[1]] || cap(m[1])) : "Run finished";
+    default: return cap(s);
+  }
 }
+function kindLabel(ev) {
+  const k = kindOf(ev);
+  if (k === "subtask_dispatched" && ev.agent === "supervisor") return "Planning";
+  return KIND_LABEL[k] || k;
+}
+const secsIn = (ev) => {
+  if (!ev.timestamp || !run.firstTs) return null;
+  return (Date.parse(ev.timestamp) - run.firstTs) / 1000;
+};
+function fmtOffset(t) { return t == null || !isFinite(t) ? "" : t < 10 ? `+${t.toFixed(1)}s` : `+${Math.round(t)}s`; }
 
 function addNote(ev) {
-  const kind = ev.type || ev.event_type, agent = ev.agent || "";
+  const kind = kindOf(ev), agent = ev.agent || "";
   // Backoff retries are noise on the score — a throttled call can emit six of them
-  // and they crowd out the actual coordination. They still reach the tempo readout
-  // below (and the persisted trace), so the run reads as waiting rather than hung.
-  if (kind === "rate_limit_backoff") { noteBackoff(ev); return; }
+  // and they crowd out the actual coordination. They still reach the status pill
+  // (and the persisted trace), so the run reads as waiting rather than hung.
+  if (kind === "rate_limit_backoff") { if (run.mode === "live") noteBackoff(ev); return; }
+  if (ev.timestamp && !run.firstTs) run.firstTs = Date.parse(ev.timestamp);
   const info = laneKey(ev), lane = ensureLane(info);
   const key = kind + "|" + agent;
   if (prevKey !== null && key !== prevKey) beat++;
   prevKey = key;
-  const v = voiceFor(kind, agent);
   const x = PAD_X + beat * BEAT_W(), y = PAD_Y + lane.idx * LANE_H();
-  const el = document.createElement("div");
-  el.className = "note enter"; el.style.setProperty("--voice", v);
+  const el = document.createElement("button");
+  el.type = "button"; el.className = "note" + (reduceMotion ? "" : " enter");
+  el.style.setProperty("--voice", voiceFor(kind, agent));
   el.style.left = x + "px"; el.style.top = y + "px";
-  const chip = ev.subtask_id ? `<span class="chip">${esc(ev.subtask_id)}</span>` : "";
-  el.innerHTML = `<div class="top"><span class="dot"></span><span class="lab">${LABEL[kind] || kind}</span>${chip}</div>` +
-                 `<div class="sum">${esc(ev.summary || "")}</div>`;
+  const text = humanize(ev), lab = kindLabel(ev);
+  el.setAttribute("aria-label", `${lab}, ${info.nm}: ${text}`);
+  el.innerHTML = `<span class="top"><span class="dot"></span><span class="lab">${esc(lab)}</span>` +
+                 `<span class="tm">${fmtOffset(secsIn(ev))}</span></span><span class="sum">${esc(text)}</span>`;
   canvas.appendChild(el);
-  const note = { beat, laneIdx: lane.idx, x, y, kind, agent, el };
-  notes.push(note);
-  bumpTallies(ev, kind);
+  const note = { beat, laneIdx: lane.idx, x, y, kind, agent, el, ev, text, lab, lane: info };
+  const i = notes.push(note) - 1;
+  el.onclick = () => select(i, true);
 
-  // signature: critic REJECT -> next analyst PLAY draws a loop-back arc
+  // signature: critic REJECT -> next analyst output draws a loop-back arc
   if (kind === "critic_reject") pendingReject = note;
   else if (kind === "subagent_result" && agent === "analyst" && pendingReject) {
     arcPairs.push([pendingReject, note]);
     drawArc(pendingReject, note); pendingReject = null;
   }
-  extendCanvas(); movePlayhead();
-}
-
-// Count what has actually been seen so far, so the readout tracks the performance
-// instead of sitting at zero until it ends.
-function bumpTallies(ev, kind) {
-  if (ev.subtask_id) liveSubtasks.add(ev.subtask_id);
-  if (kind === "critic_pass") liveCritic++;
-  if (kind === "recovery") liveRecover++;
-  $("t-subtasks").textContent = liveSubtasks.size;
-  $("t-critic").textContent = liveCritic;
-  $("t-recover").textContent = liveRecover;
+  applyPlan(ev); applyStage(ev);
+  extendCanvas();
+  if (follow) select(i, false);
+  else { $("insp-pos").textContent = `Step ${selected + 1} of ${notes.length}`; $("next").disabled = false; $("follow").hidden = false; }
 }
 
 function extendCanvas() {
-  const w = PAD_X * 2 + (beat + 1) * BEAT_W() + (NOTE_W() - BEAT_W() > 0 ? NOTE_W() - BEAT_W() : 0);
+  const w = PAD_X * 2 + (beat + 1) * BEAT_W() + Math.max(0, NOTE_W() - BEAT_W());
   canvas.style.width = Math.max(w, cwrap.clientWidth) + "px";
   arcs.setAttribute("width", canvas.style.width.replace("px", ""));
   arcs.setAttribute("height", (laneCount * LANE_H()) || 300);
   markScrollable();
 }
-// The score scrolls horizontally with no built-in cue; fade the right edge and say so
-// in the hint whenever there is more performance than fits.
+// The score scrolls horizontally with no built-in cue; fade the right edge and say so.
 function markScrollable() {
   const more = canvas.scrollWidth - cwrap.clientWidth > 4;
   $("score").classList.toggle("scrollable", more);
-  // NB: plain arrows only — IBM Plex Mono lacks the fancier arrow glyphs and the
-  // fallback renders something else entirely (U+21C4 came out as "≠").
-  $("score-hint").textContent = more
-    ? "one stave per agent · time flows right · scroll for more →"
-    : "one stave per agent · time flows right · brass = the conductor";
+  $("score-hint").textContent = "Each row is an agent; time runs left to right." + (more ? " Scroll sideways for more." : "");
 }
-function movePlayhead() {
-  const px = PAD_X + beat * BEAT_W() + NOTE_W() / 2;
-  playhead.style.left = px + "px"; playhead.classList.add("on");
-  cwrap.scrollLeft = Math.max(0, px - cwrap.clientWidth * 0.62);
+function placePlayhead(n) {
+  playhead.style.left = (n.x + NOTE_W() / 2) + "px"; playhead.classList.add("on");
+}
+function reveal(n, lead) {
+  const vw = cwrap.clientWidth;
+  if (lead) cwrap.scrollLeft = Math.max(0, n.x + NOTE_W() / 2 - vw * 0.62);
+  else if (n.x < cwrap.scrollLeft || n.x + NOTE_W() > cwrap.scrollLeft + vw) cwrap.scrollLeft = Math.max(0, n.x - vw * 0.3);
 }
 function drawArc(from, to, instant) {
   const x1 = from.x + NOTE_W(), y1 = from.y + NOTE_H / 2;
@@ -627,42 +886,199 @@ function drawArc(from, to, instant) {
   p.setAttribute("d", d);
   const len = Math.hypot(cx - x1, 0) + Math.abs(y2 - y1) + Math.hypot(x2 - cx, 0) + 40;
   p.style.setProperty("--len", len);
-  // A redraw (rescale) must not replay the draw-on animation — the arc is already
-  // part of the score by then and re-animating reads as a second rejection. The
-  // dashoffset must be cleared too: without the animation it would stay at --len,
-  // leaving the arc fully dashed out and invisible.
-  if (instant) { p.style.animation = "none"; p.style.strokeDashoffset = "0"; }
+  // A redraw (rescale) must not replay the draw-on animation, and the dashoffset must
+  // be cleared too — without the animation it would stay at --len, leaving it invisible.
+  if (instant || reduceMotion) { p.style.animation = "none"; p.style.strokeDashoffset = "0"; }
   const head = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   head.setAttribute("cx", x2); head.setAttribute("cy", y2); head.setAttribute("r", 3.5); head.setAttribute("class", "cap");
   arcs.appendChild(p); arcs.appendChild(head);
-  // The label only earns its place if it fits in the gap between the two notes. The
-  // arcs layer sits below the notes, so a label drawn into occupied space is not
-  // clipped but buried — it surfaces as a stray fragment ("…ack") beside the note.
-  const gap = Math.abs(x2 - x1);
-  if (gap > 74) {
+  // The label only earns its place if it fits in the gap between the two notes; the
+  // arcs layer sits below the notes, so a label drawn into occupied space gets buried.
+  if (Math.abs(x2 - x1) > 74) {
     const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    t.setAttribute("x", (x1 + x2) / 2); t.setAttribute("y", cy + 3);
+    t.setAttribute("x", (x1 + x2) / 2); t.setAttribute("y", cy + 4);
     t.setAttribute("text-anchor", "middle");
     t.textContent = "sent back";
     arcs.appendChild(t);
   }
 }
 
-function resetScore() {
+// --- selection + step details --------------------------------------------------
+function select(i, byUser) {
+  if (!notes.length) return;
+  i = Math.max(0, Math.min(notes.length - 1, i));
+  // Picking an earlier step while a run is live pins the view there; picking the
+  // newest step (or "Jump to latest") resumes following.
+  if (byUser) follow = isPlaying() && i === notes.length - 1;
+  if (notes[selected]) { notes[selected].el.classList.remove("sel"); notes[selected].el.removeAttribute("aria-current"); }
+  selected = i;
+  const n = notes[i];
+  n.el.classList.add("sel"); n.el.setAttribute("aria-current", "step");
+  placePlayhead(n);
+  reveal(n, !byUser && isPlaying());
+  renderInspector();
+  renderPlan();
+}
+const isPlaying = () => !!run && (run.mode === "live" || run.mode === "replaying") && !run.done;
+
+function renderInspector() {
+  const n = notes[selected], body = $("insp-body");
+  $("insp-pos").textContent = n ? `Step ${selected + 1} of ${notes.length}` : "";
+  $("prev").disabled = !n || selected === 0;
+  $("next").disabled = !n || selected >= notes.length - 1;
+  $("follow").hidden = !(isPlaying() && !follow);
+  if (!n) { body.innerHTML = `<p class="empty-note">Select a step on the timeline.</p>`; return; }
+  const ev = n.ev, rows = [];
+  const role = ROLE[n.agent];
+  rows.push(["Agent", esc(role ? `${role[0]}, ${role[1].toLowerCase()}` : cap(n.agent) || "System")]);
+  const st = ev.subtask_id && plan.get(ev.subtask_id);
+  if (ev.subtask_id) rows.push(["Subtask", `<code>${esc(ev.subtask_id)}</code>${st && st.description ? "<br>" + esc(st.description) : ""}`]);
+  if (st && st.depends_on && st.depends_on.length) rows.push(["Waits on", st.depends_on.map((d) => `<code>${esc(d)}</code>`).join(", ")]);
+  if (n.kind === "recovery") { const ids = idsIn(ev.summary); if (ids.length) rows.push(["Subtask", ids.map((d) => `<code>${esc(d)}</code>`).join(", ")]); }
+  const t = secsIn(ev);
+  if (t != null) rows.push(["When", t < 0.05 ? "At the start of the run" : `${t < 10 ? t.toFixed(1) : Math.round(t)}s into the run`]);
+  if (ev.critic_verdict) rows.push(["Verdict", ev.critic_verdict === "PASS" ? "Approved" : "Sent back for revision"]);
+  if (ev.recovery_decision) rows.push(["Decision", esc(cap(ev.recovery_decision))]);
+  if (n.kind === "run_started" && run.threadId) rows.push(["Thread", `<code>${esc(run.threadId)}</code>`]);
+  if (n.kind === "plan_produced" && plan.size) rows.push(["Subtasks", [...plan.keys()].map((d) => `<code>${esc(d)}</code>`).join(", ")]);
+  // Memory events carry their contents (newer servers), so show what was remembered.
+  for (const [key, label] of [["recalled", "Recalled"], ["stored", "Saved"]]) {
+    const items = ev[key] || (ev.data && ev.data[key]);
+    if (items && items.length) rows.push([label, `<ul>${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`]);
+  }
+  rows.push(["Trace event", `<code>${esc(n.kind)}</code><br>${esc(ev.summary || "")}`]);
+  body.innerHTML =
+    `<div class="insp-kind" style="--voice:${escAttr(n.el.style.getPropertyValue("--voice"))}"><i></i>${esc(n.lab)}</div>` +
+    `<p class="insp-text">${esc(n.text)}</p>` +
+    `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+}
+
+// --- plan panel ----------------------------------------------------------------
+function setPlan(items, keepStatus) {
+  for (const it of items) {
+    const cur = plan.get(it.id) || { status: "pending", depends_on: [] };
+    plan.set(it.id, { ...cur, ...it, status: keepStatus ? cur.status : (it.status || cur.status) });
+  }
+  renderPlan();
+}
+function setStatus(id, status, role) {
+  if (!id) return;
+  if (!plan.has(id)) plan.set(id, { id, role, description: "", depends_on: [], status });
+  else plan.get(id).status = status;
+}
+function applyPlan(ev) {
+  const k = kindOf(ev), sid = ev.subtask_id, a = ev.agent;
+  if (k === "plan_produced" || k === "plan_replanned") {
+    const items = ev.plan || (ev.data && ev.data.plan) || (run.rec && run.rec.subtasks) ||
+      idsIn(ev.summary).map((id) => ({ id }));
+    setPlan(items.map(({ id, role, description, depends_on }) => ({ id, role, description, depends_on: depends_on || [] })), true);
+    return;
+  }
+  if (k === "recovery") { for (const id of idsIn(ev.summary)) setStatus(id, "retrying", "researcher"); }
+  else if (sid) {
+    if (k === "subtask_dispatched") setStatus(sid, "running", a);
+    else if (k === "subagent_result") setStatus(sid, a === "researcher" && /failed/.test(ev.summary || "") ? "failed" : "done", a);
+    else if (k === "critic_pass") setStatus(sid, "done", a);
+    else if (k === "critic_reject") setStatus(sid, "rejected", a);
+    else if (k === "degraded") setStatus(sid, "degraded", a);
+  }
+  renderPlan();
+}
+function renderPlan() {
+  const list = $("planlist");
+  $("plan-sub").textContent = plan.size ? `${plan.size} subtasks, decided at runtime` : "";
+  if (!plan.size) { list.innerHTML = `<li><p class="empty-note">The supervisor is still planning.</p></li>`; return; }
+  const cur = notes[selected] && notes[selected].ev.subtask_id;
+  list.innerHTML = "";
+  for (const s of plan.values()) {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "pl-item" + (s.id === cur ? " on" : "");
+    b.style.setProperty("--voice", cssv(VOICE[s.role] || "--muted"));
+    const last = lastNoteFor(s.id);
+    b.disabled = last < 0;
+    const deps = (s.depends_on || []).length ? `<span class="pl-deps">After ${s.depends_on.map(esc).join(", ")}</span>` : "";
+    b.innerHTML = `<span class="pl-dot"></span><span class="pl-id">${esc(s.id)}</span>` +
+      `<span class="pl-st ${esc(s.status)}">${esc(SUB_STATUS[s.status] || s.status)}</span>` +
+      (s.description ? `<span class="pl-desc">${esc(s.description)}</span>` : "") + deps;
+    b.onclick = () => select(lastNoteFor(s.id), true);
+    li.appendChild(b); list.appendChild(li);
+  }
+}
+function lastNoteFor(id) {
+  for (let i = notes.length - 1; i >= 0; i--) if (notes[i].ev.subtask_id === id) return i;
+  return -1;
+}
+
+// --- stage strip ---------------------------------------------------------------
+function applyStage(ev) {
+  const k = kindOf(ev), a = ev.agent, sid = ev.subtask_id;
+  let idx = null;
+  if (a === "supervisor" && ["run_started", "subtask_dispatched", "plan_produced", "plan_replanned", "memory_recall"].includes(k)) idx = 0;
+  else if (STAGE_OF[a] != null) idx = STAGE_OF[a];
+  else if (k === "recovery" || k === "degraded") idx = 1;
+  if (a === "researcher" && sid) {
+    stage.researchers.add(sid);
+    if (k === "subtask_dispatched") { stage.active.add(sid); stage.maxPar = Math.max(stage.maxPar, stage.active.size); }
+    else if (k === "subagent_result") stage.active.delete(sid);
+  }
+  if (k === "recovery") stage.recov++;
+  if (k === "degraded") stage.skipped++;
+  if (k === "subagent_result" && a === "analyst") stage.drafts++;
+  if (k === "critic_pass") stage.passes++;
+  if (k === "critic_reject") stage.rejects++;
+  if (k === "memory_recall") { const m = String(ev.summary || "").match(/recalled (\d+)/); stage.recalled = m ? +m[1] : 1; }
+  if (k === "subagent_result" && a === "writer") stage.wrote = true;
+  if (idx != null) { stage.current = idx; stage.reached = Math.max(stage.reached, idx); }
+  renderStages();
+}
+function renderStages() {
+  const n = plan.size, notesFor = [
+    [n ? `${n} subtasks` : (stage.reached === 0 ? "Planning…" : ""),
+     stage.recalled ? `${stage.recalled} recalled from memory` : ""].filter(Boolean).join(", "),
+    [stage.researchers.size ? (stage.maxPar > 1 ? `${stage.researchers.size} researchers, ${stage.maxPar} at once` : `${stage.researchers.size} researcher${stage.researchers.size === 1 ? "" : "s"}`) : "",
+     stage.recov ? `<span class="w">${stage.recov} recover${stage.recov === 1 ? "y" : "ies"}</span>` : ""].filter(Boolean).join(", "),
+    stage.drafts ? `${stage.drafts} draft${stage.drafts === 1 ? "" : "s"}` : "",
+    stage.rejects ? `<span class="x">Sent back ${stage.rejects === 1 ? "once" : stage.rejects + " times"}</span>${stage.passes ? ", then approved" : ""}` : (stage.passes ? "Approved" : ""),
+    stage.wrote ? "Brief ready" : "",
+  ];
+  $("stages").innerHTML = STAGES.map(([name, v], i) => {
+    const state = run.done ? (i <= stage.reached ? "done" : "") :
+      i === stage.current ? "active" : i <= stage.reached ? "done" : "";
+    return `<li class="stage ${state}" style="--v: var(${v})"><div class="bar"></div><div class="sn">${name}</div><div class="sd">${notesFor[i]}</div></li>`;
+  }).join("");
+}
+
+// --- views ---------------------------------------------------------------------
+function startView(opts) {
+  run = { mode: opts.mode, goal: opts.goal, t0: Date.now(), firstTs: null, threadId: opts.threadId || null,
+    runId: opts.runId || null, rec: opts.rec || null, done: false };
   lanes = []; laneMap = {}; beat = 0; prevKey = null; notes = []; pendingReject = null; laneCount = 0;
-  arcPairs = []; liveSubtasks = new Set(); liveCritic = 0; liveRecover = 0;
+  arcPairs = []; plan = new Map(); selected = -1; follow = true;
+  stage = { current: 0, reached: 0, researchers: new Set(), active: new Set(), maxPar: 0,
+    recov: 0, skipped: 0, drafts: 0, passes: 0, rejects: 0, wrote: false, recalled: 0 };
   scale = 1; canvas.style.removeProperty("--note-w");
   $("score").classList.remove("scrollable", "compact");
   gutter.innerHTML = "";
   [...canvas.querySelectorAll(".note, .lane-rule")].forEach((n) => n.remove());
   arcs.innerHTML = ""; canvas.style.width = ""; canvas.style.height = "";
   playhead.classList.remove("on"); playhead.style.left = "0px";
-  $("ensemble").style.display = "none"; $("coda").classList.remove("show");
-  lastAnswer = null; resetCopy();  // a new run invalidates the previous brief
-  $("tempo").classList.add("show");
-  $("t-status").textContent = "playing…"; $("t-status").style.color = "var(--ivory)";
-  ["t-subtasks","t-critic","t-recover"].forEach((i) => $(i).textContent = "0");
-  $("t-run").textContent = "—";
+  $("intro").hidden = true; $("legend").hidden = false; $("details").hidden = false;
+  $("coda").hidden = true; $("fu").hidden = true; $("thread").hidden = true;
+  lastAnswer = null; threadCopy = null; resetCopy();  // a new run invalidates the previous brief
+  $("runbar").hidden = false;
+  setPill(opts.mode);
+  const g = parseGoal(opts.goal);
+  $("st-goal").textContent = (g.root ? "Follow-up: " : "") + g.question; $("st-goal").title = opts.goal || "";
+  $("to-brief").hidden = true; $("playback").hidden = true; $("followup").hidden = true;
+  clearInterval(clock);
+  $("st-time").textContent = "";
+  if (opts.mode === "live") {
+    const tick = () => { $("st-time").innerHTML = `<b>${fmtDur(Date.now() - run.t0) || "0s"}</b> elapsed`; };
+    tick(); clock = setInterval(tick, 1000);
+  }
+  renderPlan(); renderStages(); renderInspector();
+  markActiveRun();
 }
 
 // minimal, self-contained markdown -> html for the final brief. Escapes first, then
@@ -673,9 +1089,7 @@ function mdInline(s) {
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
   s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
-  // Citations come through as [3] or [8, 9, 10]. Only the single-number form was
-  // handled, so a grouped citation stayed literal text in the middle of a sentence.
-  // Each number links to its entry in the numbered source list.
+  // Citations come through as [3] or [8, 9, 10]; each number links to its source.
   s = s.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (_m, nums) => {
     const inner = nums.split(",").map((n) => n.trim()).filter(Boolean)
       .map((n) => `<a class="cite-link" href="#src-${n}">${n}</a>`).join(", ");
@@ -709,140 +1123,186 @@ function mdToHtml(src) {
   closeList();
   return html;
 }
-
-// --- copy the brief -------------------------------------------------------
-// The rendered brief is HTML; what is worth pasting elsewhere is the markdown the
-// writer actually produced, with the sources appended so its [n] citations still
-// resolve away from this page.
-let lastAnswer = null;
-let copyReset;
-
-function resetCopy() {
-  clearTimeout(copyReset);
-  const b = $("copy-brief");
-  b.classList.remove("done", "failed");
-  b.textContent = "copy brief";
-  b.disabled = !lastAnswer;
+// Citations are model output. Linkify only http(s) — anything else (a local corpus id
+// like "src_solar", or a javascript: URL) stays inert text.
+// Shown as site name over path: a column of full URLs is unreadable, and the site is
+// what tells a reader whether to trust the source. The full URL stays in the tooltip.
+function citation(c) {
+  const s = String(c == null ? "" : c).trim();
+  if (!/^https?:\/\//i.test(s)) return `<span class="plain">${esc(s)}</span>`;
+  let host = s, path = "";
+  try {
+    const u = new URL(s);
+    host = u.hostname.replace(/^www\./, "");
+    path = decodeURI(u.pathname + u.search).replace(/\/$/, "");
+  } catch (_) { /* malformed: show it whole */ }
+  return `<a href="${escAttr(s)}" title="${escAttr(s)}" target="_blank" rel="noopener noreferrer">` +
+    `<span class="host">${esc(host)}</span>${path ? `<span class="path">${esc(path)}</span>` : ""}</a>`;
 }
 
-function briefAsText() {
-  if (!lastAnswer) return "";
-  let out = String(lastAnswer.content || "").trim();
-  if (lastAnswer.notes) out += `\n\n> ${lastAnswer.notes}`;
-  // Number the pasted sources the way the prose cites them, not 1..n by position —
-  // otherwise the copied text's [3] points at the wrong line.
-  const numbered = lastAnswer.cited || [];
-  const cites = lastAnswer.citations || [];
-  if (numbered.length) {
-    out += "\n\n## Sources\n" + numbered.map((c) => `${c.n}. ${c.source}`).join("\n");
-  } else if (cites.length) {
-    out += "\n\n## Sources\n" + cites.map((c) => `- ${c}`).join("\n");
+// --- copy the brief ------------------------------------------------------------
+// What is worth pasting elsewhere is the markdown the writer produced, with the
+// sources appended so its [n] citations still resolve away from this page.
+let lastAnswer = null, threadCopy = null;
+const COPY_LABEL = { "copy-brief": "Copy brief", "copy-thread": "Copy thread" };
+const copyResets = {};
+function resetCopy(id) {
+  for (const k of id ? [id] : Object.keys(COPY_LABEL)) {
+    clearTimeout(copyResets[k]);
+    const b = $(k);
+    b.classList.remove("done", "failed");
+    if (k === "copy-brief") { b.textContent = COPY_LABEL[k]; b.disabled = !lastAnswer; }
+    else {
+      b.hidden = !threadCopy;
+      b.textContent = threadCopy ? `Copy thread (${threadCopy.count} briefs)` : COPY_LABEL[k];
+      b.title = "The main brief and every follow-up, as one Markdown document";
+    }
   }
-  return out + "\n";
+}
+// One brief as Markdown, sources appended and numbered the way the prose cites them
+// (not 1..n by position), so its [n] citations still resolve away from this page.
+function answerAsText(ans) {
+  let out = String(ans.content || "").trim();
+  if (ans.notes) out += `\n\n> ${ans.notes}`;
+  const numbered = ans.cited || [], cites = ans.citations || [];
+  if (numbered.length) out += "\n\n## Sources\n" + numbered.map((c) => `${c.n}. ${c.source}`).join("\n");
+  else if (cites.length) out += "\n\n## Sources\n" + cites.map((c) => `- ${c}`).join("\n");
+  return out;
+}
+const briefAsText = () => (lastAnswer ? answerAsText(lastAnswer) + "\n" : "");
+// The whole conversation as one document: each run under its question, in the order
+// asked. Each brief keeps its own sources, because its [n] numbers are its own.
+function threadAsText(records) {
+  return records.map((rec, i) => {
+    const g = parseGoal(rec.goal);
+    const head = i === 0 ? `# ${g.root || g.question}` : `# Follow-up: ${g.question}`;
+    const ans = rec.final_output || rec.answer;
+    return `${head}\n\n${ans && ans.content ? answerAsText(ans) : "_This run did not produce a brief._"}`;
+  }).join("\n\n---\n\n") + "\n";
 }
 
-async function copyBrief() {
-  const text = briefAsText();
+async function copyText(text, id) {
   if (!text.trim()) return;
-  const b = $("copy-brief");
+  const b = $(id);
   let ok = false;
   try {
-    // Only defined in a secure context; a viewer opened over plain http has no
-    // clipboard API at all, hence the fallback rather than an unexplained no-op.
+    // Only defined in a secure context; plain http has no clipboard API at all.
     if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      ok = true;
+      await navigator.clipboard.writeText(text); ok = true;
     } else {
       const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.setAttribute("readonly", "");
+      ta.value = text; ta.setAttribute("readonly", "");
       ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
-      document.body.appendChild(ta);
-      ta.select();
-      ok = document.execCommand("copy");
-      ta.remove();
+      document.body.appendChild(ta); ta.select();
+      ok = document.execCommand("copy"); ta.remove();
     }
   } catch (_) { ok = false; }
-  if (!ok) {
-    // Leave the brief selected so the prompt to copy manually is actually actionable.
+  if (!ok && id === "copy-brief") {
+    // Leave the brief selected so the prompt to copy manually is actionable.
     try {
       const sel = window.getSelection(), range = document.createRange();
-      range.selectNodeContents($("coda-brief"));
-      sel.removeAllRanges(); sel.addRange(range);
-    } catch (_) { /* selection unavailable — the label still explains the failure */ }
+      range.selectNodeContents($("coda-brief")); sel.removeAllRanges(); sel.addRange(range);
+    } catch (_) { /* the label still explains the failure */ }
   }
-  clearTimeout(copyReset);
-  b.classList.toggle("done", ok);
-  b.classList.toggle("failed", !ok);
-  b.textContent = ok ? "copied ✓" : "selected — press ⌘C";
-  copyReset = setTimeout(resetCopy, 2200);
+  clearTimeout(copyResets[id]);
+  b.classList.toggle("done", ok); b.classList.toggle("failed", !ok);
+  b.textContent = ok ? (id === "copy-thread" ? `Copied ${threadCopy.count} briefs` : "Copied")
+    : (id === "copy-brief" ? "Selected, press ⌘C to copy" : "Couldn't copy, try again");
+  copyResets[id] = setTimeout(() => resetCopy(id), 2200);
 }
+const copyBrief = () => copyText(briefAsText(), "copy-brief");
+const copyThread = () => threadCopy && copyText(threadCopy.text, "copy-thread");
 
 function showFinal(f) {
-  pokeSilence(false);
-  fitScore();  // show the whole performance, not just wherever the playhead stopped
-  $("tempo").classList.add("show");
-  const st = f.status || "—";
-  $("t-status").textContent = st;
-  const c = { completed: "--green", degraded: "--amber", halted: "--red", error: "--red" }[st];
-  $("t-status").style.color = c ? `var(${c})` : "var(--ivory)";
-  if (f.subtasks) $("t-subtasks").textContent = f.subtasks.length;
-  $("t-critic").textContent = f.critic_iterations ?? 0;
-  $("t-recover").textContent = f.recovery_attempts ?? 0;
-  if (f.run_id) $("t-run").textContent = f.run_id.slice(0, 8);
+  pokeSilence(false); clearInterval(clock);
+  run.done = true; follow = false;
+  const st = f.status || "completed";
+  setPill(st);
+  if (f.thread_id) run.threadId = f.thread_id;
+  if (f.run_id) run.runId = f.run_id;
+  if (f.subtasks && f.subtasks.length) {
+    setPlan(f.subtasks.map((s) => ({ id: s.id, role: s.role, status: s.status,
+      ...(s.description ? { description: s.description } : {}), ...(s.depends_on ? { depends_on: s.depends_on } : {}) })));
+  }
+  // Duration: the live run's wall clock, or a replay's first-to-last event timestamps.
+  let ms = run.mode === "live" ? Date.now() - run.t0 : NaN;
+  if (!isFinite(ms)) {
+    const ts = (f.events || []).map((e) => Date.parse(e.timestamp)).filter(isFinite);
+    if (ts.length) ms = Math.max(...ts) - Math.min(...ts);
+  }
+  const dur = fmtDur(ms);
+  $("st-time").innerHTML = dur ? `Took <b>${dur}</b>` : "";
+  fitScore();  // show the whole run, not just wherever the playhead stopped
+  if (notes.length) select(notes.length - 1, false);
+  renderStages();
+
+  const nSub = f.subtasks ? f.subtasks.length : plan.size;
+  const crit = f.critic_iterations ?? stage.passes + stage.rejects, rec = f.recovery_attempts ?? stage.recov;
   const ans = f.answer || f.final_output;
-  const coda = $("coda");
+  const coda = $("coda"), flag = $("coda-flag");
+  flag.className = "flag";
   if (ans && ans.content) {
-    coda.classList.add("show");
-    lastAnswer = ans;  // kept so the copy button can hand over the source markdown
-    resetCopy();
-    $("coda-status").textContent = `${st} · ${f.subtasks ? f.subtasks.length : "?"} voices · ${f.critic_iterations ?? 0} critic pass · ${f.recovery_attempts ?? 0} recoveries`;
+    coda.hidden = false;
+    lastAnswer = ans; resetCopy();
+    $("coda-h").textContent = "Brief";
+    $("coda-meta").textContent = [dur && `Written in ${dur}`, `${nSub} subtasks`,
+      `${crit} critic review${crit === 1 ? "" : "s"}`, `${rec} recover${rec === 1 ? "y" : "ies"}`].filter(Boolean).join(", ");
     $("coda-brief").innerHTML = mdToHtml(ans.content);
-    $("coda-flag").textContent = ans.validated === false ? "⚠ degraded — not fully validated (critic ceiling reached)" : "";
+    flag.textContent = ans.validated === false
+      ? "The critic hit its review limit before approving this draft, so the brief is not fully validated."
+      : st === "degraded" ? "Some research failed even after recovery, so this brief rests on partial evidence." : "";
     const src = $("coda-sources");
-    // `cited` carries the number the prose actually uses, so the list can be numbered
-    // to match. `value` sets each number explicitly, which keeps a gap (uncited
+    // `cited` carries the number the prose actually uses; `value` keeps a gap (uncited
     // evidence) a gap instead of renumbering everything after it.
-    const numbered = ans.cited || [];
-    const cites = ans.citations || [];
+    const numbered = ans.cited || [], cites = ans.citations || [];
     if (numbered.length) {
-      src.style.display = "block";
-      src.innerHTML = `<div class="h">sources</div><ol class="numbered">` +
-        numbered.map((c) => `<li id="src-${c.n}" value="${c.n}">${citation(c.source)}</li>`).join("") +
-        `</ol>`;
+      src.hidden = false;
+      src.innerHTML = `<h3>Sources</h3><ol>` +
+        numbered.map((c) => `<li id="src-${c.n}" value="${c.n}">${citation(c.source)}</li>`).join("") + `</ol>`;
     } else if (cites.length) {
-      // Runs persisted before `cited` existed: numbering these would be a guess, and
-      // a wrong number is worse than none, so they stay unnumbered.
-      src.style.display = "block";
-      src.innerHTML = `<div class="h">sources</div><ul>${cites.map((c) => `<li>${citation(c)}</li>`).join("")}</ul>`;
-    }
-    else src.style.display = "none";
+      // Runs persisted before `cited` existed: numbering these would be a guess.
+      src.hidden = false;
+      src.innerHTML = `<h3>Sources</h3><ul>${cites.map((c) => `<li>${citation(c)}</li>`).join("")}</ul>`;
+    } else src.hidden = true;
+    $("coda-body").classList.toggle("solo", src.hidden);  // no sources: the brief takes the width
+    $("to-brief").hidden = false;
   } else if (f.error) {
-    coda.classList.add("show");
-    lastAnswer = null; resetCopy();  // nothing to copy on a failed run
-    $("coda-status").textContent = st; $("coda-brief").textContent = "";
-    $("coda-flag").textContent = "✗ " + f.error; $("coda-sources").style.display = "none";
-    // if the primary model is throttled, offer the fallback right in the UI
+    coda.hidden = false;
+    lastAnswer = null; resetCopy();
+    $("coda-h").textContent = "The run failed";
+    $("coda-meta").textContent = ""; $("coda-brief").textContent = ""; $("coda-sources").hidden = true;
+    flag.classList.add("err");
+    let fix = "";
+    // if the primary model is throttled, switch to the other one right in the UI
     if (/quota|rate limit/i.test(f.error) && MODELS.fallback && currentModel === MODELS.default) {
       setModel("fallback");
-      $("mnote").textContent = `↳ ${shortModel(MODELS.default)} is rate-limited — switched to ${shortModel(MODELS.fallback)}. Press Conduct again.`;
+      $("options").open = true;
+      $("mnote").textContent = `${shortModel(MODELS.default)} is rate-limited, so this switched to ${shortModel(MODELS.fallback)}.`;
+      fix = ` Switched to ${shortModel(MODELS.fallback)}; press Run agents to try again.`;
     }
     // if the key was rejected, surface the key field so it can be corrected
-    if (/api key/i.test(f.error)) { toggleKey(true); $("keymsg").textContent = "the key was rejected — check it and try again."; }
+    if (/api key/i.test(f.error)) showKey("That key was rejected. Check it and try again.");
+    flag.textContent = f.error + fix;
   }
+  if (run.mode !== "live") $("playback").hidden = false;
+  const canFollow = !!run.threadId && !f.error && !!(ans && ans.content);
+  $("followup").hidden = !canFollow;
+  $("fu").hidden = !canFollow;
+  if (canFollow) { $("fu-in").value = ""; $("fu-hint").textContent = memoryHint(null); loadThread(); }
 }
 
-async function conduct() {
-  const goal = $("goal").value.trim();
-  if (!goal) { $("goal").focus(); return; }
+async function conduct(opts = {}) {
+  const goal = String(opts.goal ?? $("goal").value).trim();
+  if (!goal) { (opts.input || $("goal")).focus(); return; }
   if (!(await wake())) return;                    // cold backend: warm it before streaming
   if (!MODELS.default) await loadModels();        // so keyRequired reflects the server
-  const thread_id = $("threadin").value.trim() || null;
+  const thread_id = opts.thread !== undefined ? opts.thread : ($("threadin").value.trim() || null);
   const api_key = $("keyin").value.trim() || null;
-  if (keyRequired && !api_key) {
-    toggleKey(true); $("keymsg").textContent = "paste a Gemini API key to run."; return;
-  }
-  $("run").disabled = true; resetScore();
+  if (keyRequired && !api_key) { showKey("Paste a Gemini API key to run."); return; }
+  playToken++;                                    // stop any replay in progress
+  $("run").disabled = $("fu-run").disabled = true; $("run").textContent = "Running…";
+  startView({ mode: "live", goal, threadId: thread_id });
+  $("runbar").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   try {
     const resp = await fetch(api("/run"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goal, thread_id, model: currentModel, api_key }) });
@@ -859,53 +1319,177 @@ async function conduct() {
         const line = frame.split("\n").find((l) => l.startsWith("data:"));
         if (!line) continue;
         const ev = JSON.parse(line.slice(5).trim());
-        if (ev.type === "run_started") { $("t-run").textContent = ev.run_id.slice(0, 8); addNote(ev); pokeSilence(true); }
+        if (ev.type === "run_started") { run.runId = ev.run_id; run.threadId = ev.thread_id; addNote(ev); pokeSilence(true); }
         else if (ev.type === "final") showFinal(ev);
-        // A backoff event sets its own "retrying N…" movement; pokeSilence would
-        // immediately overwrite that with "playing…".
+        // A backoff event sets its own retry status; pokeSilence would overwrite it.
         else { addNote(ev); if (ev.type !== "rate_limit_backoff") pokeSilence(true); }
       }
     }
+    if (!run.done) showFinal({ status: "error", error: "The connection closed before the run finished." });
   } catch (e) {
-    addNote({ type: "error", agent: "supervisor", summary: "stream failed: " + e.message });
-    $("t-status").textContent = "error"; $("t-status").style.color = "var(--red)";
-  } finally { pokeSilence(false); $("run").disabled = false; loadRuns(); }
+    if (!run.done) showFinal({ status: "error", error: `Lost the connection to the server (${e.message}). Check that it is running, then try again.` });
+  } finally {
+    pokeSilence(false); clearInterval(clock);
+    $("run").disabled = $("fu-run").disabled = false; $("run").textContent = "Run agents";
+    loadRuns();
+  }
 }
 
+// --- past runs -------------------------------------------------------------------
+let RUNS = [], showAll = false;
+const RUNS_SHOWN = 6;
 async function loadRuns() {
   try {
-    const r = await fetch(api("/runs")); const { runs } = await r.json();
-    const list = $("runlist");
-    if (!runs || !runs.length) { list.innerHTML = '<div class="empty">Nothing performed yet.</div>'; return; }
-    list.innerHTML = "";
-    for (const run of runs) {
-      const el = document.createElement("div"); el.className = "runitem";
-      el.innerHTML = `<span class="st ${esc(run.status)}">${esc(run.status)}</span>` +
-        `<span class="g">${esc(run.goal)}</span>` +
-        `<span class="meta">${run.event_count ?? 0} beats</span>`;
-      el.onclick = () => replay(run.run_id); list.appendChild(el);
-    }
-  } catch (_) { /* server starting */ }
+    const r = await fetch(api("/runs"));
+    RUNS = (await r.json()).runs || [];
+  } catch (_) { return; /* server starting */ }
+  renderRuns();
 }
-async function replay(runId) {
-  const r = await fetch(api("/runs/" + runId)); if (!r.ok) return;
-  const rec = await r.json(); resetScore();
-  for (const ev of rec.events || []) addNote(ev);
-  showFinal(rec);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+// Past runs, grouped into threads: a follow-up hangs under the run it continues, in
+// the order it was asked, so a conversation reads top to bottom. Threads are ordered
+// by their most recent run.
+function threadGroups() {
+  const groups = new Map();
+  for (const r of RUNS) {
+    const k = r.thread_id || r.run_id;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  }
+  return [...groups.values()].map((g) => g.slice().reverse());
+}
+function renderRuns() {
+  const list = $("runlist");
+  $("watch").hidden = $("watch-hint").hidden = !RUNS.length;
+  if (!RUNS.length) { list.innerHTML = `<li><p class="empty-note">No runs yet. Finished runs show up here.</p></li>`; $("more").hidden = true; return; }
+  list.innerHTML = "";
+  const groups = threadGroups();
+  for (const g of showAll ? groups : groups.slice(0, RUNS_SHOWN)) {
+    g.forEach((r, i) => {
+      const li = document.createElement("li"), b = document.createElement("button");
+      if (i) li.className = "cont";
+      b.type = "button"; b.className = "run-row" + (i ? " fu-row" : ""); b.dataset.id = r.run_id;
+      const st = STATUS_TEXT[r.status] || r.status;
+      const flag = r.status !== "completed" ? `<small>${esc(st)}</small>` : "";
+      const more = !i && g.length > 1 ? `, ${g.length - 1} follow-up${g.length === 2 ? "" : "s"}` : "";
+      b.innerHTML = `<span class="d ${esc(r.status)}" aria-hidden="true"></span>` +
+        `<span class="g"><span class="sr-only">${i ? "Follow-up, " : ""}${esc(st)}: </span>${esc(parseGoal(r.goal).question)}${flag}</span>` +
+        `<span class="m">${esc(ago(r.created_at))}${r.event_count ? `, ${r.event_count} steps` : ""}${more}</span>`;
+      b.title = r.goal;
+      b.onclick = () => replay(r.run_id, false);
+      li.appendChild(b); list.appendChild(li);
+    });
+  }
+  const more = $("more");
+  more.hidden = groups.length <= RUNS_SHOWN;
+  more.textContent = showAll ? "Show fewer" : `Show all ${groups.length} threads`;
+  markActiveRun();
 }
 
-// --- backend readiness ------------------------------------------------------
+// --- follow-ups ------------------------------------------------------------------
+// Says what the follow-up will actually carry over. The count comes from the server's
+// memory; null means not known yet (or an older server without /threads).
+function memoryHint(n) {
+  if (n == null) return "Runs in this thread. The agents see your original question and what this thread saved to memory.";
+  if (n > 0) return `Runs in this thread. The agents see your original question and can recall ${n} finding${n === 1 ? "" : "s"} saved by earlier runs.`;
+  return "Runs in this thread. Nothing is saved to memory for it yet, so only your original question carries over.";
+}
+async function loadThread() {
+  const t = run && run.threadId;
+  if (!t) return;
+  let data;
+  try {
+    const r = await fetch(api("/threads/" + encodeURIComponent(t)));
+    if (!r.ok) return;
+    data = await r.json();
+  } catch (_) { return; }
+  if (!run || run.threadId !== t) return;  // the view moved on while this was loading
+  $("fu-hint").textContent = memoryHint(data.memory_findings);
+  const runs = data.runs || [];
+  const nav = $("thread");
+  nav.hidden = runs.length < 2;
+  if (nav.hidden) return;
+  prepareThreadCopy(t, runs);
+  $("thread-list").innerHTML = "";
+  for (const r of runs) {
+    const li = document.createElement("li"), q = parseGoal(r.goal).question;
+    if (r.run_id === run.runId) { li.setAttribute("aria-current", "true"); li.textContent = q; }
+    else {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "linkbtn"; b.textContent = q;
+      b.onclick = () => replay(r.run_id, false);
+      li.appendChild(b);
+    }
+    $("thread-list").appendChild(li);
+  }
+}
+// Fetched ahead of the click: a fetch between the click and the clipboard write can
+// outlive the user gesture that some browsers require for copying.
+async function prepareThreadCopy(t, runs) {
+  let records;
+  try {
+    records = await Promise.all(runs.map(async (r) => {
+      // The brief on screen is already in hand; the rest come from the trace store.
+      if (r.run_id === run.runId && lastAnswer) return { goal: r.goal, final_output: lastAnswer };
+      const res = await fetch(api("/runs/" + encodeURIComponent(r.run_id)));
+      return res.ok ? res.json() : { goal: r.goal, final_output: null };
+    }));
+  } catch (_) { return; }
+  if (!run || run.threadId !== t) return;
+  threadCopy = { text: threadAsText(records), count: records.filter((x) => x.final_output && x.final_output.content).length };
+  resetCopy("copy-thread");
+}
+function askFollowUp() {
+  const q = $("fu-in").value.trim();
+  if (!q) { $("fu-in").focus(); return; }
+  const root = parseGoal(run.goal).root || parseGoal(run.goal).question;
+  conduct({ goal: followUpGoal(root, q), thread: run.threadId, input: $("fu-in") });
+}
+function markActiveRun() {
+  for (const b of document.querySelectorAll(".run-row"))
+    b.setAttribute("aria-current", run && b.dataset.id === run.runId ? "true" : "false");
+}
+// The busiest recent run shows the most coordination (retries, a rejected draft), so
+// that is the one a first-time visitor gets to watch.
+function showcaseRun() {
+  const recent = RUNS.slice(0, 20);
+  return (recent.find((r) => r.status === "degraded") ||
+    recent.reduce((a, b) => ((b.event_count || 0) > (a.event_count || 0) ? b : a), recent[0]));
+}
+
+async function replay(runId, animate) {
+  const token = ++playToken;
+  let rec;
+  try {
+    const r = await fetch(api("/runs/" + runId)); if (!r.ok) return;
+    rec = await r.json();
+  } catch (_) { return; }
+  if (token !== playToken) return;
+  startView({ mode: animate ? "replaying" : "recorded", goal: rec.goal, runId: rec.run_id, threadId: rec.thread_id, rec });
+  $("runbar").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  const events = rec.events || [];
+  if (animate && !reduceMotion) {
+    for (const ev of events) {
+      addNote(ev);
+      await new Promise((r) => setTimeout(r, kindOf(ev) === "rate_limit_backoff" ? 0 : 480));
+      if (token !== playToken) return;
+    }
+  } else {
+    follow = false;
+    for (const ev of events) addNote(ev);
+  }
+  showFinal(rec);
+}
+
+// --- backend readiness -----------------------------------------------------------
 // Free-tier hosts spin the service down after an idle period; the next request then
 // waits ~1 minute for the container to boot. Say so plainly — an unexplained stall
 // reads as broken, an explained one reads as a free tier doing what free tiers do.
 let awake = false;
 // Tri-state on purpose. Static hosts (Cloudflare Pages, Netlify) serve index.html
 // with a 200 for unknown paths, so a bare `response.ok` reports a healthy backend
-// when there is no backend at all — and the failure then surfaces as a Conduct
-// button that streams HTML and does nothing. Require the real health payload, and
-// separate "nothing answered" (worth waiting out) from "something answered but it
-// is not Maestro" (a misconfiguration no amount of waiting fixes).
+// when there is no backend at all. Require the real health payload, and separate
+// "nothing answered" (worth waiting out) from "something answered but it is not
+// Maestro" (a misconfiguration no amount of waiting fixes).
 //   -> "ok" | "down" | "wrong"
 async function probe(ms) {
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), ms);
@@ -922,12 +1506,11 @@ async function probe(ms) {
 function apiOrigin() { return API || location.origin; }
 function showMisconfigured(box) {
   box.classList.remove("ready"); box.classList.add("show");
-  $("waking-text").innerHTML = `<b>no Maestro API at ${esc(apiOrigin())}</b>`;
+  $("waking-text").innerHTML = `<b>No Maestro API at ${esc(apiOrigin())}</b>`;
   $("waking-note").textContent = API
-    ? "that origin answered, but it is not the Maestro API"
-    : "set window.MAESTRO_API in config.js to the backend's origin";
+    ? "That address answered, but it is not the Maestro API."
+    : "Set window.MAESTRO_API in config.js to the backend's address.";
 }
-
 async function wake() {
   if (awake) return true;
   const box = $("waking");
@@ -953,14 +1536,14 @@ async function wake() {
 
   if (awake) {
     box.classList.add("ready");
-    $("waking-text").innerHTML = `ready in <b>${Math.round((Date.now() - t0) / 1000)}s</b>`;
+    $("waking-text").innerHTML = `Server ready in <b>${Math.round((Date.now() - t0) / 1000)}s</b>`;
     $("waking-note").textContent = "";
     setTimeout(() => box.classList.remove("show"), 2600);
   } else if (wrong) {
     showMisconfigured(box);
   } else {
-    $("waking-text").innerHTML = `<b>no response from ${esc(apiOrigin())}</b>`;
-    $("waking-note").textContent = "the backend may still be starting — try reloading";
+    $("waking-text").innerHTML = `<b>No response from ${esc(apiOrigin())}</b>`;
+    $("waking-note").textContent = "The server may still be starting. Reload the page in a minute.";
   }
   return awake;
 }
@@ -972,29 +1555,53 @@ async function boot() {
 let refit;
 addEventListener("resize", () => {
   clearTimeout(refit);
-  refit = setTimeout(() => { if (notes && notes.length && scale < 1) fitScore(); }, 180);
+  refit = setTimeout(() => { if (run && run.done && notes.length) fitScore(); }, 180);
+});
+
+// ← → step through the run, unless the visitor is typing.
+addEventListener("keydown", (e) => {
+  if (!notes || !notes.length || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    e.preventDefault();
+    select(selected + (e.key === "ArrowLeft" ? -1 : 1), true);
+    notes[selected].el.focus({ preventScroll: true });
+  }
 });
 
 // wire up
-$("run").onclick = conduct;
+$("run").onclick = () => conduct();  // not the click event as options
 $("goal").addEventListener("keydown", (e) => { if (e.key === "Enter") conduct(); });
 $("refresh").onclick = loadRuns;
+$("more").onclick = () => { showAll = !showAll; renderRuns(); };
 $("copy-brief").onclick = copyBrief;
+$("copy-thread").onclick = copyThread;
+$("prev").onclick = () => select(selected - 1, true);
+$("next").onclick = () => select(selected + 1, true);
+$("follow").onclick = () => { follow = true; select(notes.length - 1, false); };
+$("watch").onclick = () => { const r = showcaseRun(); if (r) replay(r.run_id, true); };
+$("playback").onclick = () => { if (run && run.runId) replay(run.runId, true); };
+$("followup").onclick = () => {
+  $("fu").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  $("fu-in").focus({ preventScroll: true });
+};
+$("fu-run").onclick = askFollowUp;
+$("fu-in").addEventListener("keydown", (e) => { if (e.key === "Enter") askFollowUp(); });
+$("thread-clear").onclick = () => { $("threadin").value = ""; optSummary(); $("goal").focus(); };
+for (const q of FOLLOW_UPS) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "chipbtn"; b.textContent = q;
+  b.onclick = () => { $("fu-in").value = q; $("fu-in").focus(); };
+  $("fu-suggest").appendChild(b);
+}
 resetCopy();  // disabled until a run produces a brief
-const ex = $("examples");
-for (const g of EXAMPLES) {
-  const s = document.createElement("span");
-  s.textContent = g.length > 50 ? g.slice(0, 50) + "…" : g;
-  s.title = g; s.onclick = () => { $("goal").value = g; $("goal").focus(); };
-  ex.appendChild(s);
+for (const [label, goal] of EXAMPLES) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "chipbtn"; b.textContent = label; b.title = goal;
+  b.onclick = () => { $("goal").value = goal; $("goal").focus(); };
+  $("examples").appendChild(b);
 }
-const pl = $("players");
-for (const [role, sect] of ENSEMBLE) {
-  const el = document.createElement("div"); el.className = "player";
-  el.style.setProperty("--voice", cssv(VOICE[role]));
-  el.innerHTML = `<div class="disc"></div><div class="pn">${role[0].toUpperCase() + role.slice(1)}</div><div class="pr">${sect}</div>`;
-  pl.appendChild(el);
-}
+window.__replay = replay;
 boot();
 </script>
 </body>
