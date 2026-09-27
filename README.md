@@ -9,9 +9,7 @@
 > replayable node-by-node. Built on LangGraph, runs on the Gemini free tier with exponential
 > backoff and a concurrency cap.
 
-**[▶ Live demo / Loom](#)** &nbsp;·&nbsp; **[Graph diagram](#the-graph)** &nbsp;·&nbsp; **[Architecture](ARCHITECTURE.md)**
-
-<!-- Loom link goes in the badge above once recorded. -->
+**[Graph diagram](#the-graph)** &nbsp;·&nbsp; **[Architecture](ARCHITECTURE.md)**
 
 The task it performs — *"produce a cited analytical brief on a non-trivial question"* (e.g. *"Compare
 PostgreSQL and MongoDB for a startup's first product, and recommend one"*) — is deliberately chosen
@@ -143,7 +141,7 @@ git clone https://github.com/krishivsaini/Maestro.git
 cd Maestro
 uv sync                       # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 64 passed, 1 skipped
+# run the full test suite (offline, no API key) — 66 passed, 1 skipped
 uv run pytest
 
 # see the coordination in the browser
@@ -238,7 +236,7 @@ What the free tier costs you, concretely:
 
 ## Tests
 
-`uv run pytest` → **64 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
+`uv run pytest` → **66 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
 exceeded, dependents wait), `test_critic_loop`, `test_recovery`, `test_loop_control`, plus memory,
 trace-replay, service, and writer-citation tests.
