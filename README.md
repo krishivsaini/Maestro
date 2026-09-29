@@ -9,9 +9,9 @@
 > replayable node-by-node. Built on LangGraph, runs on the Gemini free tier with exponential
 > backoff and a concurrency cap.
 
-<a href="docs/media/maestro-demo.mp4"><img src="docs/media/maestro-demo.jpg" width="100%" alt="Maestro demo: a question is split into subtasks, two researchers work in parallel, a critic sends the draft back, a writer produces a cited brief, and a follow-up continues the thread. Click to watch (28 seconds, with sound)."></a>
+https://github.com/user-attachments/assets/4956f815-f2f3-4dc4-a0ac-8a024fb712ee
 
-**[Demo video](docs/media/maestro-demo.mp4)** &nbsp;·&nbsp; **[Graph diagram](#the-graph)** &nbsp;·&nbsp; **[Architecture](ARCHITECTURE.md)**
+**[Graph diagram](#the-graph)** &nbsp;·&nbsp; **[Architecture](ARCHITECTURE.md)**
 
 The task it performs — *"produce a cited analytical brief on a non-trivial question"* (e.g. *"Compare
 PostgreSQL and MongoDB for a startup's first product, and recommend one"*) — is deliberately chosen
