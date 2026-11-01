@@ -1,5 +1,7 @@
 # Maestro
 
+[![tests](https://github.com/krishivsaini/Maestro/actions/workflows/tests.yml/badge.svg)](https://github.com/krishivsaini/Maestro/actions/workflows/tests.yml)
+
 > **A supervisor-orchestrated multi-agent system with visible delegation and recovery.**
 >
 > A supervisor agent decomposes a goal into subtasks at runtime and delegates each to a
@@ -148,7 +150,7 @@ git clone https://github.com/krishivsaini/Maestro.git
 cd Maestro
 uv sync                       # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 121 passed, 1 skipped
+# run the full test suite (offline, no API key) — 130 passed, 1 skipped
 uv run pytest
 
 # see the coordination in the browser
@@ -244,10 +246,26 @@ What the free tier costs you, concretely:
 
 ## Tests
 
-`uv run pytest` → **121 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
+`uv run pytest` → **130 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
 exceeded, dependents wait), `test_critic_loop`, `test_critic_review`, `test_recovery`, `test_loop_control`,
 plus memory, trace-replay, service, guardrail and writer-citation tests.
+
+### Recorded runs, replayed
+
+Stubbed tests prove the mechanics, but not that the code still behaves on *real* model output.
+`data/cassettes` holds recorded live runs: every model response and search result, and what the run
+produced. `tests/test_replays.py` replays each one offline through the current code in about a second:
+planning validation, scheduling, grounding and code checks, the critic's decision, routing, citations
+all run for real; only the model and the search engine are played back. If the code now decides
+differently on the same output, the test says exactly what changed.
+
+```bash
+python scripts/record_run.py "Compare solar and wind ..." --name solar-wind   # record (live)
+python scripts/record_run.py --refresh solar-wind                            # accept a deliberate change
+```
+
+Every push runs the whole suite, replays included, in GitHub Actions: no key, no quota.
 
 ### Critic evaluation
 
