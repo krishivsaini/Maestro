@@ -132,8 +132,9 @@ class FollowUpGuard:
     """Decides whether a follow-up stays within its thread's research."""
 
     def __init__(self, settings: Settings, *, classifier: Optional[Classifier] = None,
-                 enabled: bool = True, min_shared_terms: int = 2) -> None:
+                 enabled: bool = True, min_shared_terms: int = 2, meter=None) -> None:
         self.settings = settings
+        self.meter = meter
         self.classifier = classifier
         self.enabled = enabled
         self.min_shared = min_shared_terms
@@ -141,7 +142,8 @@ class FollowUpGuard:
     def _model_classify(self, question: str, ctx: ThreadContext) -> Relevance:
         from .llm import get_chat_model  # lazy: no model is built unless the fast path misses
 
-        chat = get_chat_model(self.settings, temperature=0.0).with_structured_output(Relevance)
+        chat = get_chat_model(self.settings, temperature=0.0, meter=self.meter, agent="guard") \
+            .with_structured_output(Relevance)
         human = f"{ctx.render()}\n\nFollow-up question:\n{question}"
         return resilient_call(chat.invoke, [("system", GUARD_PROMPT), ("human", human)], settings=self.settings)
 

@@ -163,7 +163,11 @@ def recording(book: Book):
 @contextmanager
 def replaying(book: Book):
     def models(_real):
-        return lambda *a, **k: _Replayer(book)
+        from .usage import metered
+
+        # calls are still counted on a run's meter (no tokens: the cassette holds parsed output)
+        return lambda *a, **k: metered(_Replayer(book), k.get("meter"), k.get("agent", "model"),
+                                       k.get("model_id") or "replay")
 
     def search(_real):
         def run(query, n):

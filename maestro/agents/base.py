@@ -34,6 +34,7 @@ class Subagent:
 
     def __init__(self, *, model: Any = None, settings: Optional[Settings] = None) -> None:
         self._chat = model  # injectable; None -> lazily build the real Gemini model
+        self.meter = None   # a run's UsageMeter, set by build_graph (maestro/usage.py)
         self.settings = settings or get_settings()
         self.log = get_logger(f"agent.{getattr(self, 'name', 'subagent')}")
 
@@ -41,7 +42,7 @@ class Subagent:
         if self._chat is None:
             from ..llm import get_chat_model  # lazy
 
-            self._chat = get_chat_model(self.settings)
+            self._chat = get_chat_model(self.settings, meter=self.meter, agent=self.name)
         return self._chat
 
     def _messages(self, human: str) -> list[tuple[str, str]]:

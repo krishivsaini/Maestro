@@ -42,6 +42,7 @@ class RunRecord(BaseModel):
     final_output: Optional[Answer] = None
     subtasks: list[Subtask] = []
     events: list[TraceEvent] = []
+    usage: dict = {}  # model calls, tokens and time (maestro/usage.py); empty for older runs
 
 
 def record_from_state(state: dict) -> RunRecord:
@@ -59,6 +60,7 @@ def record_from_state(state: dict) -> RunRecord:
         final_output=state.get("final_output"),
         subtasks=list(state.get("subtasks", [])),
         events=events,
+        usage=state.get("usage") or {},
     )
 
 

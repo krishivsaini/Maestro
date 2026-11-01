@@ -111,6 +111,10 @@ class Settings(BaseSettings):
     # trust it when there is one: anyone can send that header to a server reached directly.
     trust_proxy: bool = False
 
+    # --- Cost reporting (maestro/usage.py): set to see a dollar estimate per run ---
+    price_input_per_million: float = 0.0   # USD per 1M input tokens
+    price_output_per_million: float = 0.0  # USD per 1M output tokens
+
     # --- Follow-ups ---
     # Check that a follow-up is about its thread's research before any agent runs
     # (see maestro/guard.py). MAESTRO_FOLLOWUP_GUARD=false turns it off.

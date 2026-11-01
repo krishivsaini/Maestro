@@ -188,7 +188,7 @@ def test_critic_falls_back_to_the_runs_model_when_its_own_fails(make_stub, monke
 
     built = []
 
-    def fake_get_chat_model(settings, *, model_id=None, temperature=None):
+    def fake_get_chat_model(settings, *, model_id=None, temperature=None, **_):
         built.append((model_id, temperature))
         if model_id == "gemini-3.6-flash":
             def broken(schema, messages):

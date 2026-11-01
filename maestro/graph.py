@@ -122,8 +122,12 @@ def build_graph(
     *,
     settings: Optional[Settings] = None,
     event_sink: Optional[Callable[[TraceEvent], None]] = None,
+    meter=None,
 ):
     """Compile and return the Maestro StateGraph.
+
+    ``meter`` (a ``UsageMeter``, maestro/usage.py) records every model and embedding
+    call the run makes, per agent.
 
     ``event_sink`` receives events *as they happen*, before the node producing them
     returns. The graph stream only yields between nodes, so without it a node that
@@ -134,6 +138,17 @@ def build_graph(
     """
     ag = agents or build_default_agents(settings)
     cfg = ag.settings
+    if meter is not None:
+        for agent in (ag.researcher, ag.analyst, ag.critic, ag.writer):
+            agent.meter = meter
+
+    def _with_meter(fn, *args, **kwargs):
+        """Call a memory method, handing it the meter if it records embedding calls."""
+        import inspect
+
+        if meter is not None and "meter" in inspect.signature(fn).parameters:
+            kwargs["meter"] = meter
+        return fn(*args, **kwargs)
 
     def _backoff_recorder(
         sink_to: list[TraceEvent],
@@ -215,7 +230,7 @@ def build_graph(
                           "decomposing the goal into subtasks"))
         subs = decompose(
             state["goal"], planner=ag.planner, settings=cfg,
-            on_retry=_backoff_recorder(events, "supervisor"),
+            on_retry=_backoff_recorder(events, "supervisor"), meter=meter,
         )
         # The plan rides along with the event so a live viewer can show what each
         # subtask is for and what it waits on, not just a list of ids.
@@ -232,7 +247,7 @@ def build_graph(
         }
         # long-term memory recall: inform this run with prior findings
         if ag.memory is not None:
-            hits = ag.memory.query(state["thread_id"], state["goal"], k=3)
+            hits = _with_meter(ag.memory.query, state["thread_id"], state["goal"], k=3)
             if hits:
                 update["memory_hits"] = hits
                 _emit(events, _ev(EventType.memory_recall, "supervisor",
@@ -459,7 +474,7 @@ def build_graph(
             findings = distill_findings(state.get("analysis"), answer)
             add_many = getattr(ag.memory, "add_many", None)
             if add_many:  # one embedding call for the run's findings, not one each
-                add_many(state["thread_id"], findings)
+                _with_meter(add_many, state["thread_id"], findings)
             else:
                 for finding in findings:
                     ag.memory.add(state["thread_id"], finding)
@@ -509,7 +524,8 @@ def run_goal(
     settings: Optional[Settings] = None,
     thread_id: Optional[str] = None,
     recursion_limit: int = 50,
+    meter=None,
 ) -> MaestroState:
     """Convenience: build the graph and run one goal to completion."""
-    graph = build_graph(agents=agents, settings=settings)
+    graph = build_graph(agents=agents, settings=settings, meter=meter)
     return graph.invoke(new_state(goal, thread_id=thread_id), {"recursion_limit": recursion_limit})

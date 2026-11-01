@@ -299,7 +299,8 @@ class Critic(Subagent):
             from ..llm import get_chat_model
 
             self._chat = get_chat_model(self.settings, model_id=self._critic_model(),
-                                        temperature=self.settings.critic_temperature)
+                                        temperature=self.settings.critic_temperature,
+                                        meter=self.meter, agent=self.name)
         return self._chat
 
     def _review(self, human: str, on_retry: Optional[OnRetry]) -> CriticOutput:
@@ -314,7 +315,8 @@ class Critic(Subagent):
             self.log.warning("critic model %s failed (%s); reviewing on %s", cid, exc, own)
             from ..llm import get_chat_model
 
-            self._chat = get_chat_model(self.settings, model_id=own, temperature=self.settings.critic_temperature)
+            self._chat = get_chat_model(self.settings, model_id=own, temperature=self.settings.critic_temperature,
+                                        meter=self.meter, agent=self.name)
             return self._structured(CriticOutput, human, on_retry=on_retry)
 
     def __init__(self, **kw) -> None:

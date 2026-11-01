@@ -148,6 +148,7 @@ def build_llm_planner(
     settings: Optional[Settings] = None,
     *,
     on_retry: Optional[OnRetry] = None,
+    meter=None,
 ) -> Planner:
     """The production planner: prompts Gemini for a structured Plan (backoff-wrapped)."""
     cfg = settings or get_settings()
@@ -155,7 +156,7 @@ def build_llm_planner(
     def planner(goal: str, roles: list[Role], max_subtasks: int) -> Plan:
         from .llm import get_chat_model  # lazy
 
-        model = get_chat_model(cfg)
+        model = get_chat_model(cfg, meter=meter, agent="supervisor")
         structured = model.with_structured_output(Plan)
         role_lines = "\n".join(f"- {r.value}: {ROLE_GUIDE[r]}" for r in roles)
         system = DECOMP_SYSTEM.format(roles=role_lines, max_subtasks=max_subtasks)
@@ -231,6 +232,7 @@ def decompose(
     planner: Optional[Planner] = None,
     settings: Optional[Settings] = None,
     on_retry: Optional[OnRetry] = None,
+    meter=None,
 ) -> list[Subtask]:
     """Decompose a goal into validated subtasks.
 
@@ -238,7 +240,7 @@ def decompose(
     stub) for offline/deterministic runs.
     """
     cfg = settings or get_settings()
-    plan_fn = planner or build_llm_planner(cfg, on_retry=on_retry)
+    plan_fn = planner or build_llm_planner(cfg, on_retry=on_retry, meter=meter)
     plan = plan_fn(goal, list(Role), cfg.max_subtasks)
     subtasks = validate_and_build(plan, cfg.max_subtasks)
     log.info("decomposed goal into %d subtasks: %s", len(subtasks), [s.id for s in subtasks])

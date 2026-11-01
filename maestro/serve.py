@@ -27,6 +27,7 @@ from .config import get_settings
 from .graph import MaestroAgents, build_default_agents, build_graph
 from .guard import FollowUpGuard, ThreadContext, split_follow_up
 from .limits import RunLimits
+from .usage import UsageMeter
 from .logging_config import get_logger
 from .db import Database
 from .memory import SqlMemory
@@ -166,7 +167,7 @@ def create_app(
     # one long-term memory.
     allowed_models = {settings.model_id, settings.fallback_model_id}
 
-    def graph_for(model_id: Optional[str], api_key: Optional[str] = None, *, event_sink=None):
+    def graph_for(model_id: Optional[str], api_key: Optional[str] = None, *, event_sink=None, meter=None):
         """Build this request's graph, wired to its own live event sink.
 
         Built per request rather than cached: the sink is per-run, and compiling the
@@ -174,7 +175,7 @@ def create_app(
         bring-your-own key is used transiently here and never stored or logged.
         """
         if injected:  # stub agents (tests) don't use a real model/key
-            return build_graph(agents=agents, settings=settings, event_sink=event_sink), settings.model_id
+            return build_graph(agents=agents, settings=settings, event_sink=event_sink, meter=meter), settings.model_id
         target = model_id if model_id in allowed_models else settings.model_id
         update = {"model_id": target}
         if api_key:
@@ -182,7 +183,7 @@ def create_app(
         cfg = settings.model_copy(update=update)
         alt = build_default_agents(cfg)
         alt.memory = agents.memory  # every graph shares the one long-term memory
-        return build_graph(agents=alt, settings=cfg, event_sink=event_sink), target
+        return build_graph(agents=alt, settings=cfg, event_sink=event_sink, meter=meter), target
 
     def thread_context(thread_id: Optional[str]) -> Optional[ThreadContext]:
         """The research a follow-up in this thread has to stay within; None for a new thread."""
@@ -198,11 +199,11 @@ def create_app(
         return ThreadContext(question=question, plan=[s.description for s in (root.subtasks if root else [])],
                              findings=findings(thread_id) if findings else [], brief=brief)
 
-    def guard_for(api_key: Optional[str]) -> FollowUpGuard:
+    def guard_for(api_key: Optional[str], meter=None) -> FollowUpGuard:
         if injected and followup_classifier is None:
             return FollowUpGuard(settings, enabled=False)
         cfg = settings.model_copy(update={"google_api_key": api_key}) if api_key else settings
-        return FollowUpGuard(cfg, classifier=followup_classifier, enabled=settings.followup_guard)
+        return FollowUpGuard(cfg, classifier=followup_classifier, enabled=settings.followup_guard, meter=meter)
 
     limits = RunLimits(settings)
 
@@ -279,16 +280,18 @@ def create_app(
         log.info("run %s START | thread=%s | model=%s | byok=%s | goal=%r",
                  run_id, thread_id, req.model or settings.model_id, bool(req.api_key), req.goal)
 
+        meter = UsageMeter()  # every model and embedding call this request makes
+
         def stream():
             # A follow-up must be about its thread's research. Checked before any agent
             # runs, so an off-topic question costs at most one small call, not a run.
             ctx = thread_context(req.thread_id)
             if ctx is not None:
-                verdict = guard_for(req.api_key).check(split_follow_up(req.goal)[1], ctx)
+                verdict = guard_for(req.api_key, meter).check(split_follow_up(req.goal)[1], ctx)
                 log.info("run %s follow-up guard: %s (%s) %s", run_id,
                          "allowed" if verdict.allowed else "BLOCKED", verdict.method, verdict.reason)
                 if not verdict.allowed:
-                    yield _sse({"type": "blocked", "reason": verdict.reason,
+                    yield _sse({"type": "blocked", "reason": verdict.reason, "usage": meter.summary(settings),
                                 "question": split_follow_up(req.goal)[1], "thread_id": thread_id})
                     return
 
@@ -297,7 +300,7 @@ def create_app(
             # with no way to tell waiting from hung. Run the graph on its own thread
             # and forward the events it publishes as they happen.
             live: "queue.Queue" = queue.Queue()
-            graph, model_id = graph_for(req.model, req.api_key, event_sink=live.put)
+            graph, model_id = graph_for(req.model, req.api_key, event_sink=live.put, meter=meter)
 
             yield _sse({"type": "run_started", "agent": "supervisor", "model": model_id,
                         "run_id": run_id, "thread_id": thread_id, "goal": req.goal})
@@ -375,7 +378,7 @@ def create_app(
             # and must find this run (and its findings) already there.
             if error is None:  # only persist genuinely completed runs
                 try:
-                    store.save_run(last)
+                    store.save_run({**last, "usage": meter.summary(settings)})
                 except Exception as exc:  # persistence failure must not break the response
                     log.warning("failed to persist run %s: %s", run_id, exc)
             ans = last.get("final_output")
@@ -394,6 +397,7 @@ def create_app(
                     ],
                     "critic_iterations": last.get("critic_iterations", 0),
                     "recovery_attempts": last.get("recovery_attempts", 0),
+                    "usage": meter.summary(settings),
                 }
             )
             log.info(

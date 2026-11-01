@@ -46,8 +46,26 @@ def get_chat_model(
     *,
     model_id: Optional[str] = None,
     temperature: Optional[float] = None,
+    meter: Any = None,
+    agent: str = "model",
 ) -> Any:
-    """Build a chat model for the requested provider. Clear error if no key is set."""
+    """Build a chat model for the requested provider. Clear error if no key is set.
+
+    Given a run's ``UsageMeter`` (maestro/usage.py), every call the model makes is
+    recorded against ``agent``: tokens, latency, success."""
+    from .usage import metered
+
+    cfg = settings or get_settings()
+    model = _build_chat_model(cfg, model_id=model_id, temperature=temperature)
+    return metered(model, meter, agent, model_id or cfg.model_id)
+
+
+def _build_chat_model(
+    settings: Optional[Settings] = None,
+    *,
+    model_id: Optional[str] = None,
+    temperature: Optional[float] = None,
+) -> Any:
     cfg = settings or get_settings()
     provider, model = split_model_id(model_id or cfg.model_id, cfg.llm_provider)
     temp = cfg.temperature if temperature is None else temperature

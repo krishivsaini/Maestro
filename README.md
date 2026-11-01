@@ -136,7 +136,7 @@ Both the critic-rejection and recovery paths are triggerable on demand for a dem
 | **Loop & cost control** | `MAX_STEPS` backstop + stall/repeat detectors so a multi-agent run can't spiral in calls or cost. |
 | **Long-term memory** | Findings are written on completion and recalled during planning on a later turn of the same thread, from the same database as the runs (SQLite, or Postgres when deployed). Recall is **by meaning** (Gemini embeddings, findings and questions embedded as documents vs queries) with a word-matching fallback, so an embedding outage degrades recall instead of failing the run. On 12 follow-ups phrased in different words from their findings (`scripts/memory_eval.py`), meaning recall ranked the right finding first 12/12, word matching 1/12. |
 | **Follow-up guardrail** | A follow-up must be about its thread's research. A free term-overlap check passes clear cases; otherwise one temperature-0 model call decides, and steering attempts ("ignore your instructions") always get the model check. Off-topic follow-ups are refused before any agent runs, with the reason and an offer to ask them as a new question. |
-| **Observability** | Every transition is a `TraceEvent`; each run is persisted to SQLite and **replayable node-by-node**, exportable as JSON. |
+| **Observability** | Every transition is a `TraceEvent`; each run is persisted (SQLite, or Postgres when deployed) and **replayable node-by-node**, exportable as JSON. Every run also records **what it cost**: each model call's agent, tokens, latency and success (failed retries included) plus embedding calls, streamed with the result, kept with the run, and shown in the viewer's step details (a typical run: 6 calls, ~11k tokens). A dollar estimate appears only if you set per-token prices. |
 | **Service + viewer** | FastAPI `POST /run` streams the coordination as SSE; a minimal web viewer renders it live and replays past runs. |
 
 ---
@@ -150,7 +150,7 @@ git clone https://github.com/krishivsaini/Maestro.git
 cd Maestro
 uv sync                       # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 162 passed, 7 skipped
+# run the full test suite (offline, no API key) — 168 passed, 7 skipped
 uv run pytest
 
 # see the coordination in the browser
@@ -272,7 +272,7 @@ Python), so any Postgres works.
 
 ## Tests
 
-`uv run pytest` → **162 passed, 7 skipped**, offline (LLM stubbed, no key/quota); the 5 Postgres variants of the storage tests run when `MAESTRO_TEST_DATABASE_URL` is set, as in CI. The hard parts each
+`uv run pytest` → **168 passed, 7 skipped**, offline (LLM stubbed, no key/quota); the 5 Postgres variants of the storage tests run when `MAESTRO_TEST_DATABASE_URL` is set, as in CI. The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
 exceeded, dependents wait), `test_critic_loop`, `test_critic_review`, `test_recovery`, `test_loop_control`,
 plus memory, trace-replay, service, guardrail and writer-citation tests.

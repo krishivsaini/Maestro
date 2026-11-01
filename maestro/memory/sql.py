@@ -19,6 +19,7 @@ happens in numpy: no vector extension, any Postgres will do.
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -72,21 +73,36 @@ class SqlMemory:
         self.db.add_column("memory", "semantic", "TEXT")
         self.db.add_column("memory", "semantic_tag", "TEXT")
 
-    def _meanings(self, texts: list[str]) -> list[Optional[np.ndarray]]:
+    def _embed(self, fn, arg, meter):
+        """Call the meaning embedder, recording the call on a run's meter."""
+        t0 = time.perf_counter()
+        try:
+            out = fn(arg)
+        except Exception:
+            if meter is not None:
+                meter.record("memory", getattr(self.meaning, "model", "embedder"), kind="embedding",
+                             seconds=time.perf_counter() - t0, ok=False)
+            raise
+        if meter is not None:
+            meter.record("memory", getattr(self.meaning, "model", "embedder"), kind="embedding",
+                         seconds=time.perf_counter() - t0)
+        return out
+
+    def _meanings(self, texts: list[str], meter=None) -> list[Optional[np.ndarray]]:
         if not self.meaning or not texts:
             return [None] * len(texts)
         try:
             docs = getattr(self.meaning, "embed_documents", self.meaning.embed)
-            return [_unit(v) for v in docs(texts)]
+            return [_unit(v) for v in self._embed(docs, texts, meter)]
         except Exception as exc:  # noqa: BLE001 — recall falls back to words for these
             log.warning("could not embed %d findings by meaning (%s); storing word vectors only",
                         len(texts), type(exc).__name__)
             return [None] * len(texts)
 
-    def add_many(self, thread_id: str, contents: list[str]) -> None:
+    def add_many(self, thread_id: str, contents: list[str], meter=None) -> None:
         """Store a run's findings, embedding them by meaning in one call."""
         contents = [c for c in contents if c.strip()]
-        meanings = self._meanings(contents)
+        meanings = self._meanings(contents, meter)
         now = datetime.now(timezone.utc).isoformat()
         rows = []
         for content, meaning in zip(contents, meanings):
@@ -101,7 +117,7 @@ class SqlMemory:
     def add(self, thread_id: str, content: str) -> None:
         self.add_many(thread_id, [content])
 
-    def query(self, thread_id: str, query: str, k: int = 3) -> list[MemoryItem]:
+    def query(self, thread_id: str, query: str, k: int = 3, meter=None) -> list[MemoryItem]:
         rows = self.db.query("SELECT content, embedding, semantic, semantic_tag FROM memory "
                              "WHERE thread_id = ? ORDER BY created_at", (thread_id,))
         if not rows:
@@ -110,7 +126,8 @@ class SqlMemory:
         if self.meaning and any(r["semantic_tag"] == self.tag for r in rows):
             try:
                 ask = getattr(self.meaning, "embed_query", None)
-                q_meaning = _unit(ask(query) if ask else self.meaning.embed([query])[0])
+                q_meaning = _unit(self._embed(ask, query, meter) if ask
+                                  else self._embed(self.meaning.embed, [query], meter)[0])
             except Exception as exc:  # noqa: BLE001
                 log.warning("could not embed the question by meaning (%s); recalling by words", type(exc).__name__)
         q_words = _unit(self.words.embed([query])[0])

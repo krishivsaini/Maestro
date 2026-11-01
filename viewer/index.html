@@ -980,6 +980,19 @@ function renderInspector() {
       .map((i) => `<li><b>${esc(i.severity)}</b> ${esc(i.problem)}${i.origin === "check" ? " <span class=\"muted\">(code check)</span>" : ""}</li>`)
       .join("")}</ul>`]);
   }
+  // The finished run carries what it cost (newer servers): calls, tokens and time, per agent.
+  if (n.kind === "completed" && run.usage && run.usage.calls != null) {
+    const u = run.usage, fmt = (x) => Number(x || 0).toLocaleString();
+    rows.push(["Model calls", `${u.calls}${u.failed_calls ? `, ${u.failed_calls} of them retried after failing` : ""}`]);
+    if (u.total_tokens) rows.push(["Tokens", `${fmt(u.total_tokens)} (${fmt(u.input_tokens)} in, ${fmt(u.output_tokens)} out)`]);
+    rows.push(["Model time", `${Number(u.model_seconds).toFixed(1)}s, summed across calls`]);
+    if (u.embedding_calls) rows.push(["Embedding calls", String(u.embedding_calls)]);
+    const order = ["guard", "supervisor", "researcher", "analyst", "critic", "writer"];
+    const agents = Object.entries(u.by_agent || {}).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+    if (agents.length) rows.push(["By agent", `<ul>${agents.map(([a, x]) =>
+      `<li>${esc(cap(a))}: ${x.calls} call${x.calls === 1 ? "" : "s"}${x.input_tokens + x.output_tokens ? `, ${fmt(x.input_tokens + x.output_tokens)} tokens` : ""}, ${Number(x.seconds).toFixed(1)}s</li>`).join("")}</ul>`]);
+    if (u.estimated_cost_usd != null) rows.push(["Estimated cost", `$${u.estimated_cost_usd.toFixed(4)}`]);
+  }
   // Memory events carry their contents (newer servers), so show what was remembered.
   for (const [key, label] of [["recalled", "Recalled"], ["stored", "Saved"]]) {
     const items = ev[key] || (ev.data && ev.data[key]);
@@ -1258,6 +1271,7 @@ function showFinal(f) {
   const st = f.status || "completed";
   setPill(st);
   if (f.thread_id) run.threadId = f.thread_id;
+  run.usage = f.usage || null;
   if (f.run_id) run.runId = f.run_id;
   if (f.subtasks && f.subtasks.length) {
     setPlan(f.subtasks.map((s) => ({ id: s.id, role: s.role, status: s.status,
