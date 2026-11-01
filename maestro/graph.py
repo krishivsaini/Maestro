@@ -457,8 +457,12 @@ def build_graph(
         # long-term memory write: persist distilled findings for later turns
         if ag.memory is not None:
             findings = distill_findings(state.get("analysis"), answer)
-            for finding in findings:
-                ag.memory.add(state["thread_id"], finding)
+            add_many = getattr(ag.memory, "add_many", None)
+            if add_many:  # one embedding call for the run's findings, not one each
+                add_many(state["thread_id"], findings)
+            else:
+                for finding in findings:
+                    ag.memory.add(state["thread_id"], finding)
             if findings:
                 _emit(events, _ev(EventType.memory_write, "supervisor",
                                   f"stored {len(findings)} finding(s) to long-term memory",

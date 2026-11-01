@@ -1,0 +1,43 @@
+{
+  "_about": "Recall cases for scripts/memory_eval.py. Each thread holds findings like the ones runs save; each query is a follow-up phrased in different words from the finding it should recall (expected = its index). Recall is thread-scoped, so the task is ranking a thread's own findings.",
+  "threads": [
+    {
+      "id": "solar-wind",
+      "findings": [
+        "Wind turbines in the US averaged a capacity factor of about 35% in 2022, against about 24% for utility-scale solar.",
+        "Solar output falls to zero at night, so evening demand must be met by storage or other sources.",
+        "Four-hour battery storage costs fell roughly 70% between 2015 and 2023.",
+        "Geographically dispersed wind farms reduce aggregate output variability compared with a single site.",
+        "Typhoon-rated wind turbines can survive gusts above 70 m/s, but blades are often feathered and output stops during storms.",
+        "Geopolitical disruptions to supply chains can shift the relative cost of solar panels versus wind turbines."
+      ],
+      "queries": [
+        ["Which one keeps producing after sunset?", 1],
+        ["How often do the generators actually deliver their rated power?", 0],
+        ["Have batteries become more affordable?", 2],
+        ["Does spreading turbines across a region smooth things out?", 3],
+        ["What happens to wind farms in a hurricane?", 4],
+        ["Could trade wars change which one is cheaper?", 5]
+      ]
+    },
+    {
+      "id": "postgres-mongo",
+      "findings": [
+        "PostgreSQL provides full ACID transactions across multiple tables by default.",
+        "MongoDB's documentation advises modelling data to minimise multi-document transactions.",
+        "PostgreSQL's JSONB type stores and indexes semi-structured JSON documents.",
+        "MongoDB includes built-in horizontal sharding to distribute data across servers.",
+        "PostgreSQL was the most used database among professional developers in the 2023 Stack Overflow survey.",
+        "A MongoDB blog argues its flexible schema lets startups iterate faster early on."
+      ],
+      "queries": [
+        ["If two writes must both succeed or both fail, which keeps my data consistent?", 0],
+        ["Will it be easy to hire engineers who already know it?", 4],
+        ["Can I keep flexible, document-shaped data without running a second database?", 2],
+        ["What if we need to spread the data over many machines later?", 3],
+        ["Will changing our data model every week be painful?", 5],
+        ["Should we avoid operations that update several records at once?", 1]
+      ]
+    }
+  ]
+}

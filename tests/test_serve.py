@@ -132,11 +132,12 @@ def test_follow_up_recalls_memory_after_a_restart(make_stub, tmp_path):
             return responder(schema, messages)
         return make_stub(wrapped)
 
-    store, mem_dir = TraceStore(":memory:"), str(tmp_path / "memory")
+    # memory lives in the runs database, so a restart over the same database keeps it
+    store = TraceStore(str(tmp_path / "maestro.db"))
 
     def client():
         agents = build_stub_agents(topical, [CriticDecision.passed])
-        return TestClient(create_app(agents=agents, trace_store=store, memory_dir=mem_dir))
+        return TestClient(create_app(agents=agents, trace_store=TraceStore(store.db)))
 
     first = _parse_sse(client().post("/run", json={"goal": "Compare solar and wind", "thread_id": "t1"}).text)
     wrote = next(e for e in first if e["type"] == "memory_write")

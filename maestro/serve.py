@@ -29,7 +29,7 @@ from .guard import FollowUpGuard, ThreadContext, split_follow_up
 from .limits import RunLimits
 from .logging_config import get_logger
 from .db import Database
-from .memory import HashingEmbedder, LongTermMemory, SqlMemory
+from .memory import SqlMemory
 from .resilience import is_rate_limit_error
 from .state import _utcnow, new_state
 from .trace import TraceStore
@@ -90,20 +90,50 @@ def _friendly_error(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}"
 
 
+
+def memory_embedder(settings):
+    """The embedder memory recalls with: by meaning via Gemini when configured and a key
+    exists, else None (words only)."""
+    if settings.memory_embedder == "gemini" and settings.google_api_key:
+        from .memory.embedders import GeminiEmbedder
+
+        return GeminiEmbedder(settings)
+    return None
+
+
+def import_file_memory(directory: Optional[str], memory) -> None:
+    """Bring findings saved by the earlier file-based memory into the database, once."""
+    import os
+
+    meta = os.path.join(directory or "", "meta.json")
+    if not directory or not os.path.exists(meta) or memory.db.query("SELECT 1 AS x FROM memory LIMIT 1"):
+        return
+    try:
+        rows = json.load(open(meta)).get("meta", [])
+    except Exception as exc:  # noqa: BLE001
+        log.warning("could not read %s: %s", meta, exc)
+        return
+    by_thread: dict[str, list[str]] = {}
+    for r in rows:
+        by_thread.setdefault(r["thread_id"], []).append(r["content"])
+    for thread_id, contents in by_thread.items():
+        memory.add_many(thread_id, contents)
+    log.info("imported %d findings from %s into the database", len(rows), directory)
+
+
 def create_app(
     *,
     agents: Optional[MaestroAgents] = None,
     memory: object = None,
     trace_store: Optional[TraceStore] = None,
-    memory_dir: Optional[str] = None,
     followup_classifier=None,
 ) -> FastAPI:
     """Build the FastAPI app. Inject stub ``agents`` / an in-memory store for tests.
 
-    Long-term memory is kept on disk (``memory_store_dir``) so a follow-up can still
-    recall its thread's findings after a restart; held only in RAM, every restart
-    silently turned follow-ups on earlier runs into fresh starts. Injected stub agents
-    stay in-memory unless a ``memory_dir`` is passed explicitly.
+    Runs and long-term memory live in one database: SQLite locally, Postgres when
+    ``DATABASE_URL`` is set (so both survive a restart on a host that wipes its disk).
+    Memory recalls by meaning (Gemini embeddings) and falls back to words; injected
+    stub agents use words only, so tests make no API calls.
 
     A follow-up (a run in a thread that already has runs) is checked against that
     thread's research first; see maestro/guard.py. Stub agents have no model to check
@@ -113,9 +143,6 @@ def create_app(
     injected = agents is not None  # stub agents (tests) are not model-switchable
     if agents is None:
         agents = build_default_agents(settings)
-    mem_dir = memory_dir if memory_dir is not None else (None if injected else settings.memory_store_dir)
-    # With a database URL, runs and memory share one durable database; otherwise SQLite
-    # for runs and files for memory, which a free host's disk wipe loses on restart.
     db, storage = None, "sqlite"
     if settings.database_url and trace_store is None:
         try:
@@ -126,26 +153,13 @@ def create_app(
             storage = "sqlite (database unreachable)"
             log.error("DATABASE_URL is set but the database can't be reached (%s: %s); falling back to "
                       "local storage, which a restart wipes", type(exc).__name__, str(exc).split("\n")[0][:200])
-    # attach thread-scoped long-term memory (HashingEmbedder default -> no torch)
+    store = trace_store if trace_store is not None else TraceStore(db or settings.trace_db_path)
     if memory is not None:
         agents.memory = memory
     elif agents.memory is None:
-        if db is not None:
-            agents.memory, mem_dir = SqlMemory(db), None
-        else:
-            agents.memory = (LongTermMemory.load(mem_dir, embedder=HashingEmbedder()) if mem_dir
-                             else LongTermMemory(embedder=HashingEmbedder()))
-    store = trace_store if trace_store is not None else TraceStore(db or settings.trace_db_path)
-    mem_lock = threading.Lock()
-
-    def persist_memory() -> None:
-        if not mem_dir or not hasattr(agents.memory, "persist"):
-            return
-        try:
-            with mem_lock:
-                agents.memory.persist(mem_dir)
-        except Exception as exc:  # a failed save must not break the response
-            log.warning("failed to persist long-term memory: %s", exc)
+        agents.memory = SqlMemory(store.db, None if injected else memory_embedder(settings))
+        if not injected:
+            import_file_memory(settings.memory_store_dir, agents.memory)
 
     # A run can pick the primary or the higher-throughput alternative from the UI
     # (e.g. when the primary hits its free-tier daily quota). Every graph shares the
@@ -364,7 +378,6 @@ def create_app(
                     store.save_run(last)
                 except Exception as exc:  # persistence failure must not break the response
                     log.warning("failed to persist run %s: %s", run_id, exc)
-                persist_memory()
             ans = last.get("final_output")
             yield _sse(
                 {

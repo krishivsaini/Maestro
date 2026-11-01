@@ -116,6 +116,13 @@ class Database:
             finally:
                 self._tx_depth -= 1
 
+    def add_column(self, table: str, column: str, kind: str) -> None:
+        """Add a column to an existing table if it isn't there yet (a schema upgrade)."""
+        if self.dialect == "postgres":
+            self.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {kind}")
+        elif column not in {r["name"] for r in self.query(f"PRAGMA table_info({table})")}:
+            self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+
     def upsert(self, table: str, key: str, row: dict) -> None:
         cols = list(row)
         marks = ", ".join("?" for _ in cols)

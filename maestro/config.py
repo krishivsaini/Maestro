@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     model_id: str = "gemini-3.5-flash-lite"
     fallback_model_id: str = "gemini-3.6-flash"  # fuller model, separate daily quota
     embedding_model: str = "BAAI/bge-small-en-v1.5"  # local, free (sentence-transformers)
+    # Long-term memory recall: "gemini" embeds findings and questions by meaning through
+    # the Gemini embedding API; "hashing" matches words (no API call). See memory/embedders.py.
+    memory_embedder: str = "gemini"
+    gemini_embedding_model: str = "gemini-embedding-001"
+    embedding_dim: int = 768
     temperature: float = 0.2
 
     # --- Search tool ---

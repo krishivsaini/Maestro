@@ -174,13 +174,20 @@ signal you can point to, not a silent behavior.
 | Layer | Lifetime | Backing |
 |---|---|---|
 | **Working** | one run | graph state (`evidence`, `subtasks`, `analysis`, …) |
-| **Long-term** | across turns of a thread | FAISS inner-product index + local embeddings |
+| **Long-term** | across turns of a thread | a `memory` table beside the runs (SQLite or Postgres) |
 
-On completion the graph writes distilled findings (the analysis claims) tagged with `thread_id`;
-on a later turn the supervisor recalls them during planning (`memory_hits`) and the Analyst uses
-them. The embedder is swappable: `SentenceTransformerEmbedder` (`bge-small`, production, free) or
-`HashingEmbedder` (deterministic, no-torch, tests). Verified live: turn-2 recalled turn-1 findings
-by semantic similarity (cosine ~0.72–0.75) and the brief visibly incorporated them.
+On completion the graph writes distilled findings (the analysis claims) tagged with `thread_id`, in
+one batch; on a later turn the supervisor recalls them during planning (`memory_hits`) and the
+Analyst uses them. The server's memory is `SqlMemory` (`maestro/memory/sql.py`): each finding is
+stored with a **meaning** vector from `GeminiEmbedder` (tagged with its model, so vectors from
+different models are never compared) and a **word** vector from `HashingEmbedder`. Recall ranks by
+meaning and falls back to words when the embedding API is unavailable or a finding predates meaning
+vectors. A thread holds a handful of findings, so ranking happens in numpy: no vector extension.
+
+`scripts/memory_eval.py` measures recall on follow-ups phrased in different words from their
+findings: `gemini-embedding-001` ranked the right finding first 12/12 (MRR 1.00),
+`gemini-embedding-2` 11/12, word matching 1/12 (MRR 0.36). The FAISS-backed `LongTermMemory`
+remains for in-process use (`run_goal`), with a swappable embedder.
 
 ---
 
