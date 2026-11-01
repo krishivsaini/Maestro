@@ -93,6 +93,9 @@ class Subtask(BaseModel):
     result: Optional[str] = None
     error: Optional[str] = None
     attempts: int = 0  # for recovery bounding
+    # Search queries for a researcher subtask, written by the planner: short and aimed at
+    # specific sources, rather than searching the whole description sentence.
+    queries: list[str] = Field(default_factory=list)
 
 
 class Evidence(BaseModel):

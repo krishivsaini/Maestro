@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Optional
 
-FORMAT = 1
+FORMAT = 2  # 2: page text recorded alongside searches
 
 # Settings that change behaviour. Secrets, paths and server options are not recorded.
 _NOT_RECORDED = re.compile(r"key|path|dir|host|port|cors|provider_base|base_url")
@@ -51,9 +51,11 @@ class ReplayMiss(BaseException):
 class Book:
     """The calls of one run: model outputs by key, raw search results by query."""
 
-    def __init__(self, calls: Optional[dict] = None, searches: Optional[dict] = None) -> None:
+    def __init__(self, calls: Optional[dict] = None, searches: Optional[dict] = None,
+                 pages: Optional[dict] = None) -> None:
         self.calls: dict[str, dict] = dict(calls or {})
         self.searches: dict[str, list] = dict(searches or {})
+        self.pages: dict[str, Optional[str]] = dict(pages or {})  # extracted page text, None = unreadable
         self._seen: Counter = Counter()
         self._lock = threading.Lock()
 
@@ -118,18 +120,21 @@ class _Replayer:
 
 
 @contextmanager
-def _patched(model_factory, search):
-    """Swap the model factory and the raw search call; everything between stays real."""
+def _patched(model_factory, search, page):
+    """Swap the model factory, the raw search call and the page fetch; everything
+    between them stays real."""
     import maestro.llm as llm
+    import maestro.tools.fetch_page as fp
     import maestro.tools.web_search as ws
 
-    real_model, real_search = llm.get_chat_model, ws._ddgs_text
+    real_model, real_search, real_page = llm.get_chat_model, ws._ddgs_text, fp.fetch_text
     llm.get_chat_model = model_factory(real_model)
     ws._ddgs_text = search(real_search)
+    fp.fetch_text = page(real_page)
     try:
         yield
     finally:
-        llm.get_chat_model, ws._ddgs_text = real_model, real_search
+        llm.get_chat_model, ws._ddgs_text, fp.fetch_text = real_model, real_search, real_page
 
 
 @contextmanager
@@ -144,7 +149,14 @@ def recording(book: Book):
             return raw
         return run
 
-    with _patched(models, search):
+    def page(real):
+        def run(url, timeout=6.0):
+            text = real(url, timeout)
+            book.pages[url] = text
+            return text
+        return run
+
+    with _patched(models, search, page):
         yield book
 
 
@@ -160,7 +172,14 @@ def replaying(book: Book):
             return book.searches[query]
         return run
 
-    with _patched(models, search):
+    def page(_real):
+        def run(url, timeout=6.0):
+            if url not in book.pages:
+                raise ReplayMiss(f"the cassette has no page {url!r}. Re-record it (scripts/record_run.py).")
+            return book.pages[url]
+        return run
+
+    with _patched(models, search, page):
         yield book
 
 
@@ -198,7 +217,7 @@ def save(path: str, goal: str, settings, book: Book, final: dict, note: str = ""
         "format": FORMAT, "goal": goal, "note": note,
         "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "settings": settings_snapshot(settings),
-        "calls": dict(sorted(book.calls.items())), "searches": book.searches,
+        "calls": dict(sorted(book.calls.items())), "searches": book.searches, "pages": book.pages,
         "expected": summarize(final),
     }
     with open(path, "w") as f:
@@ -220,5 +239,5 @@ def replay(data: dict) -> dict:
     from .graph import build_default_agents, run_goal
 
     settings = Settings(**data["settings"])
-    with replaying(Book(data["calls"], data["searches"])):
+    with replaying(Book(data["calls"], data["searches"], data.get("pages"))):
         return run_goal(data["goal"], agents=build_default_agents(settings), settings=settings)

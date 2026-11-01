@@ -950,6 +950,8 @@ function renderInspector() {
   const st = ev.subtask_id && plan.get(ev.subtask_id);
   if (ev.subtask_id) rows.push(["Subtask", `<code>${esc(ev.subtask_id)}</code>${st && st.description ? "<br>" + esc(st.description) : ""}`]);
   if (st && st.depends_on && st.depends_on.length) rows.push(["Waits on", st.depends_on.map((d) => `<code>${esc(d)}</code>`).join(", ")]);
+  if (st && st.queries && st.queries.length && n.agent === "researcher")
+    rows.push(["Searched for", `<ul>${st.queries.map((q) => `<li>${esc(q)}</li>`).join("")}</ul>`]);
   if (n.kind === "recovery") { const ids = idsIn(ev.summary); if (ids.length) rows.push(["Subtask", ids.map((d) => `<code>${esc(d)}</code>`).join(", ")]); }
   const t = secsIn(ev);
   if (t != null) rows.push(["When", t < 0.05 ? "At the start of the run" : `${t < 10 ? t.toFixed(1) : Math.round(t)}s into the run`]);
@@ -1008,7 +1010,7 @@ function applyPlan(ev) {
   if (k === "plan_produced" || k === "plan_replanned") {
     const items = ev.plan || (ev.data && ev.data.plan) || (run.rec && run.rec.subtasks) ||
       idsIn(ev.summary).map((id) => ({ id }));
-    setPlan(items.map(({ id, role, description, depends_on }) => ({ id, role, description, depends_on: depends_on || [] })), true);
+    setPlan(items.map(({ id, role, description, depends_on, queries }) => ({ id, role, description, depends_on: depends_on || [], queries: queries || [] })), true);
     return;
   }
   if (k === "recovery") { for (const id of idsIn(ev.summary)) setStatus(id, "retrying", "researcher"); }

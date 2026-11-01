@@ -58,7 +58,20 @@ def test_a_replay_never_reaches_the_network(monkeypatch):
         cassette.replay(data)
 
 
+def test_a_replay_never_fetches_a_page_live():
+    data = copy.deepcopy(cassette.load(CASSETTES[0]))
+    assert data["pages"], "cassettes record the pages researchers read"
+    data["pages"] = {}
+    with pytest.raises(cassette.ReplayMiss, match="no page"):
+        cassette.replay(data)
+
+
 @pytest.mark.parametrize("path", CASSETTES, ids=lambda p: os.path.basename(p)[:-5])
 def test_cassettes_hold_no_secrets(path):
+    # cassettes hold page text, which may well mention "api_key"; check for key material itself
     text = open(path).read()
-    assert "AIza" not in text and "api_key" not in text.lower()
+    assert "AIza" not in text  # the prefix of every Google API key
+    for var in ("GOOGLE_API_KEY", "GROQ_API_KEY", "NVIDIA_API_KEY", "SEARCH_API_KEY"):
+        key = os.environ.get(var)
+        if key:
+            assert key not in text

@@ -223,7 +223,8 @@ def build_graph(
                           f"planned {len(subs)} subtasks: {[s.id for s in subs]}",
                           data={"plan": [{"id": s.id, "role": s.role.value,
                                           "description": s.description,
-                                          "depends_on": list(s.depends_on)} for s in subs]}))
+                                          "depends_on": list(s.depends_on),
+                                          "queries": list(s.queries)} for s in subs]}))
         update = {
             "subtasks": subs,
             "step_count": state.get("step_count", 0) + 1,

@@ -130,7 +130,7 @@ Both the critic-rejection and recovery paths are triggerable on demand for a dem
 | **Separate contexts** | Each subagent has its own system prompt and sees only its task + relevant structured inputs — the only cross-agent hand-off is structured data via the supervisor. |
 | **Bounded parallelism** | Independent researchers run concurrently in a thread pool capped at `MAX_PARALLEL` (default 2); dependents wait. Concurrency is *observed* so the claim is measurable. |
 | **Critic loop** | A structured review, not a vibe check. Code first checks what needs no model (uncited claims, citations to evidence that doesn't exist, figures that aren't in the evidence they cite, no recommendation when one is asked). The model then checks every claim against its cited evidence (supported, partial, overstated, miscited, unsupported, contradicted) and raises issues by severity; **the verdict is decided in code** from those findings. A re-review must confirm each fix and may only add new blockers, and a revision that fixes nothing stops the loop. Bounded by `MAX_CRITIC_ITERS`; degrades gracefully at the ceiling. |
-| **Grounded agents** | The Analyst cites evidence numbers on every claim and revises from its previous draft against numbered issues. Researchers' findings are dropped if their source isn't one of the results they were shown, and near-duplicates are removed. The Writer leaves out claims the critic found unsupported and states unresolved issues as caveats. |
+| **Grounded agents** | The Analyst cites evidence numbers on every claim and revises from its previous draft against numbered issues. Researchers search with 1-3 queries the planner wrote for them, read the top pages rather than only search snippets, and keep the passages relevant to their question; findings are dropped if their source isn't one of the results they were shown, and near-duplicates are removed. The Writer leaves out claims the critic found unsupported and states unresolved issues as caveats. |
 | **Visible recovery** | retry → re-delegate → degrade, bounded by `MAX_RECOVERY_ATTEMPTS`; every rung is a trace event. |
 | **Rate-limit resilience** | Every LLM/tool call is wrapped in exponential backoff + jitter (tenacity), retrying 429s **and** transient 5xx/network errors — added after a live Gemini 503. |
 | **Loop & cost control** | `MAX_STEPS` backstop + stall/repeat detectors so a multi-agent run can't spiral in calls or cost. |
@@ -150,7 +150,7 @@ git clone https://github.com/krishivsaini/Maestro.git
 cd Maestro
 uv sync                       # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 130 passed, 1 skipped
+# run the full test suite (offline, no API key) — 137 passed, 1 skipped
 uv run pytest
 
 # see the coordination in the browser
@@ -230,8 +230,10 @@ What the free tier costs you, concretely:
 
 ## Limitations (deliberate scope choices)
 
-- **Retrieval is simple**, not production RAG — web/knowledge lookups + a small local corpus, enough
-  to produce evidence-backed briefs, not a tuned retrieval stack.
+- **Retrieval is web search plus page reading**, not production RAG. Researchers search with planned
+  queries and read the top pages (stdlib HTML extraction, relevant passages kept), but pages that block
+  automated readers, render only with JavaScript, or are PDFs fall back to their search snippet; in a
+  sample of 29 real result pages, 20 were readable.
 - **Evaluation is lightweight** — ~15 scripted cases that demonstrate behavior (including failure and
   recovery), plus a 24-draft seeded-flaw set for the critic (below); not a metrics framework, and final
   output quality is hand-judged.
@@ -246,7 +248,7 @@ What the free tier costs you, concretely:
 
 ## Tests
 
-`uv run pytest` → **130 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
+`uv run pytest` → **137 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
 exceeded, dependents wait), `test_critic_loop`, `test_critic_review`, `test_recovery`, `test_loop_control`,
 plus memory, trace-replay, service, guardrail and writer-citation tests.

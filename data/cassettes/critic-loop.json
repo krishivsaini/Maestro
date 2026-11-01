@@ -1,8 +1,8 @@
 {
- "format": 1,
+ "format": 2,
  "goal": "Compare REST and GraphQL for a public API and recommend one.",
  "note": "the first review is forced to REJECT, so the revise and re-review path runs on real output",
- "recorded_at": "2026-11-01T11:49:16+00:00",
+ "recorded_at": "2026-11-01T12:06:21+00:00",
  "settings": {
   "llm_provider": "google",
   "model_id": "gemini-3.5-flash-lite",
@@ -11,6 +11,11 @@
   "temperature": 0.2,
   "search_provider": "duckduckgo",
   "search_max_results": 5,
+  "search_queries": 2,
+  "search_results_kept": 8,
+  "fetch_pages": 3,
+  "page_chars": 2500,
+  "fetch_timeout_seconds": 6.0,
   "max_parallel": 2,
   "max_subtasks": 6,
   "max_steps": 40,
@@ -37,46 +42,46 @@
   "AnalysisModel#0": {
    "schema": "AnalysisModel",
    "output": {
-    "content": "When designing a public API, choosing between REST and GraphQL requires evaluating architectural maturity, performance optimization, and caching complexity. REST benefits from decades of established best practices focusing on scalability, maintainability, and microservices integration [1, 3]. Furthermore, REST performance and resource consumption heavily depend on the chosen framework and execution environment [2], while its uniform interface makes traditional HTTP caching straightforward. Conversely, GraphQL addresses the specific challenges of over-fetching and under-fetching through flexible client-driven queries and structural patterns like fragments [5, 6, 7]. However, this flexibility creates highly variable query structures across clients, which significantly complicates caching strategies since responses differ significantly [7]. Comparing these two paradigms for a public API, REST remains the superior recommendation due to its predictable caching mechanisms and well-established design patterns that ensure robust scalability and security. This recommendation would change if the primary product requirement shifts heavily toward deeply nested, highly variable data structures across diverse client applications where minimizing payload size outweighs caching simplicity.",
+    "content": "When comparing REST and GraphQL for a public API, performance characteristics depend heavily on query complexity and operational scale. REST outperforms GraphQL by 15-25% for simple queries fetching single resources because its straightforward request-response cycle has less overhead, while GraphQL adds 20-40ms of latency for basic parsing and resolution [1]. Conversely, GraphQL can reduce bandwidth by 30-50% for complex queries and achieve 40-60% faster response times by replacing multiple sequential REST calls with a single request [2]. However, real-world production usage shows that GraphQL does not automatically eliminate waterfalls and underfetching in practice; production applications often issue multiple requests over HTTP POST without batching [5]. Operational maturity and tooling strongly favor REST. REST benefits from decades of mature tooling and established best practices, as well as natural HTTP caching via CDNs, proxies, and browsers using standard cache headers [3, 4]. In contrast, GraphQL lacks a natural URL-based caching primitive, making HTTP-layer caching complex and prone to failure modes like N+1 queries, slow resolvers, and broken caches [3, 6, 7]. Ultimately, for a public API, REST is recommended due to its mature ecosystem, simpler production stability, and effortless HTTP caching. This recommendation would change if the public API's primary consumers are heavily resource-constrained mobile apps requiring massive payload reductions through flexible nested queries, and the engineering team is prepared to invest heavily in custom caching and query complexity management.",
     "claims": [
      {
-      "text": "REST architectural approaches include microservices, caching, and strategies for secure and performant API design in high-performance applications.",
+      "text": "REST outperforms GraphQL by 15-25% for simple queries fetching single resources, while GraphQL adds 20-40ms of latency for basic operations.",
       "evidence": [
        1
       ]
      },
      {
-      "text": "REST performance and computational resource consumption show significant differences across various frameworks and execution environments.",
+      "text": "GraphQL reduces total bandwidth by 30-50% for complex queries and is 40-60% faster when fetching related data by replacing multiple sequential REST calls.",
       "evidence": [
        2
       ]
      },
      {
-      "text": "RESTful API design emphasizes scalability, maintainability, and performance optimization for scalable web services.",
+      "text": "REST caches naturally at the HTTP layer using standard cache headers on GET responses, providing free caching infrastructure.",
       "evidence": [
        3
       ]
      },
      {
-      "text": "Understanding API architecture involves comparing types like REST and GraphQL to keep APIs performant and secure.",
+      "text": "REST benefits from decades of mature tooling and established best practices, favoring production stability compared to the evolving GraphQL ecosystem.",
       "evidence": [
        4
       ]
      },
      {
-      "text": "Properly structuring nested queries in GraphQL is crucial for efficient data retrieval to reduce load times and improve performance.",
+      "text": "Production measurements of GraphQL across multiple applications show it does not eliminate underfetching and waterfalls in practice, often making multiple unbatched HTTP POST requests.",
       "evidence": [
        5
       ]
      },
      {
-      "text": "Using gql fragment on allows clients to fetch all necessary type-specific data within a single query, adhering to GraphQL's no over-fetching principle.",
+      "text": "GraphQL can introduce failure modes like slow resolvers, N+1 queries, and broken caches.",
       "evidence": [
        6
       ]
      },
      {
-      "text": "Avoiding over-fetching in GraphQL introduces complexity in caching strategies because responses may differ significantly across different clients or components.",
+      "text": "GraphQL lacks a URL-like primitive for globally unique object identifiers, requiring explicit API design for certain types of caching.",
       "evidence": [
        7
       ]
@@ -88,46 +93,47 @@
   "AnalysisModel#1": {
    "schema": "AnalysisModel",
    "output": {
-    "content": "When designing a public API, choosing between REST and GraphQL requires evaluating architectural maturity, performance optimization, and caching complexity. REST benefits from decades of established best practices focusing on scalability, maintainability, and microservices integration [1, 3]. Furthermore, REST performance and resource consumption heavily depend on the chosen framework and execution environment [2], while its uniform interface makes traditional HTTP caching straightforward. Conversely, GraphQL addresses the specific challenges of over-fetching and under-fetching through flexible client-driven queries and structural patterns like fragments [5, 6, 7]. However, this flexibility creates highly variable query structures across clients, which significantly complicates caching strategies since responses differ significantly [7]. Comparing these two paradigms for a public API, REST remains the superior recommendation due to its predictable caching mechanisms and well-established design practices that ensure robust scalability and security. This recommendation would change if the primary product requirement shifts heavily toward deeply nested, highly variable data structures across diverse client applications where minimizing payload size outweighs caching simplicity.",
+    "content": "When comparing REST and GraphQL for a public API, performance characteristics depend heavily on query complexity and operational scale. REST outperforms GraphQL by 15-25% for simple queries fetching single resources because its straightforward request-response cycle has less overhead, while GraphQL adds 20-40ms of latency for basic parsing and resolution [1]. Conversely, GraphQL can reduce bandwidth by 30-50% for complex queries and achieve 40-60% faster response times by replacing multiple sequential REST calls with a single request [2]. However, real-world production usage shows that GraphQL does not automatically eliminate waterfalls and underfetching in practice; production applications often issue multiple requests over HTTP POST without batching [5, 8]. Operational maturity and tooling strongly favor REST. REST benefits from decades of mature tooling and established best practices, as well as natural HTTP caching via CDNs, proxies, and browsers using standard cache headers [3, 4]. In contrast, GraphQL lacks a natural URL-based caching primitive, making HTTP-layer caching complex and prone to failure modes like N+1 queries, slow resolvers, and broken caches [3, 6, 7]. Ultimately, for a public API, REST is recommended due to its mature ecosystem, simpler production stability, and effortless HTTP caching. This recommendation would change if the public API's primary consumers are heavily resource-constrained mobile apps requiring massive payload reductions through flexible nested queries, and the engineering team is prepared to invest heavily in custom caching and query complexity management.",
     "claims": [
      {
-      "text": "REST architectural approaches include microservices, caching, and strategies for secure and performant API design in high-performance applications.",
+      "text": "REST outperforms GraphQL by 15-25% for simple queries fetching single resources, while GraphQL adds 20-40ms of latency for basic operations.",
       "evidence": [
        1
       ]
      },
      {
-      "text": "REST performance and computational resource consumption show significant differences across various frameworks and execution environments.",
+      "text": "GraphQL reduces total bandwidth by 30-50% for complex queries and is 40-60% faster when fetching related data by replacing multiple sequential REST calls.",
       "evidence": [
        2
       ]
      },
      {
-      "text": "RESTful API design emphasizes scalability, maintainability, and performance optimization for scalable web services.",
+      "text": "REST caches naturally at the HTTP layer using standard cache headers on GET responses, providing free caching infrastructure.",
       "evidence": [
        3
       ]
      },
      {
-      "text": "Understanding API architecture involves comparing types like REST and GraphQL to keep APIs performant and secure.",
+      "text": "REST benefits from decades of mature tooling and established best practices, favoring production stability compared to the evolving GraphQL ecosystem.",
       "evidence": [
        4
       ]
      },
      {
-      "text": "Properly structuring nested queries in GraphQL is crucial for efficient data retrieval to reduce load times and improve performance.",
+      "text": "Production measurements of GraphQL across multiple applications show it does not eliminate underfetching and waterfalls in practice, often making multiple unbatched HTTP POST requests.",
       "evidence": [
-       5
+       5,
+       8
       ]
      },
      {
-      "text": "Using gql fragment on allows clients to fetch all necessary type-specific data within a single query, adhering to GraphQL's no over-fetching principle.",
+      "text": "GraphQL can introduce failure modes like slow resolvers, N+1 queries, and broken caches.",
       "evidence": [
        6
       ]
      },
      {
-      "text": "Avoiding over-fetching in GraphQL introduces complexity in caching strategies because responses may differ significantly across different clients or components.",
+      "text": "GraphQL lacks a URL-like primitive for globally unique object identifiers, requiring explicit API design for certain types of caching.",
       "evidence": [
        7
       ]
@@ -136,7 +142,7 @@
     "addressed": [
      {
       "issue": 1,
-      "change": "Verified all claims against their cited evidence items to ensure every claim has explicit and accurate backing from the provided text."
+      "change": "Ensured all claims in the claims array are fully supported by their citations, updating claim 5 to also cite evidence item 8 regarding theoretical versus practical claims."
      }
     ]
    }
@@ -186,10 +192,10 @@
      {
       "id": 1,
       "resolved": true,
-      "note": "All claims in the revision are properly grounded and cited against the provided evidence."
+      "note": "All claims are now fully supported and correctly cited by the evidence."
      }
     ],
-    "summary": "The draft is well-written, accurately references the provided evidence for all claims, addresses the goal by comparing REST and GraphQL for a public API, provides a clear recommendation, and outlines the conditional factors under which that recommendation would change."
+    "summary": "The draft is well-grounded, comprehensively covers the evidence, and provides a clear recommendation supported by the comparison of REST and GraphQL."
    }
   },
   "Plan#0": {
@@ -198,82 +204,97 @@
     "subtasks": [
      {
       "id": "research_rest",
-      "description": "Gather evidence on REST API architecture, performance, caching, and ecosystem maturity.",
+      "description": "Gather performance, caching, and ecosystem data for REST APIs.",
       "role": "researcher",
-      "depends_on": []
+      "depends_on": [],
+      "queries": [
+       "REST API performance advantages caching",
+       "REST API best practices public use cases"
+      ]
      },
      {
       "id": "research_graphql",
-      "description": "Gather evidence on GraphQL query efficiency, over-fetching prevention, caching challenges, and client complexity.",
+      "description": "Gather performance, caching, and complexity data for GraphQL APIs.",
       "role": "researcher",
-      "depends_on": []
+      "depends_on": [],
+      "queries": [
+       "GraphQL public API challenges overfetching",
+       "GraphQL caching strategies performance benchmarks"
+      ]
      },
      {
-      "id": "analyze_comparison",
-      "description": "Synthesize the research findings into a structured comparison evaluating REST vs GraphQL for public APIs.",
+      "id": "analyze",
+      "description": "Synthesize research evidence comparing REST and GraphQL for public APIs.",
       "role": "analyst",
       "depends_on": [
        "research_rest",
        "research_graphql"
-      ]
+      ],
+      "queries": []
      },
      {
-      "id": "critique_analysis",
-      "description": "Review the structured analysis for gaps, unsupported claims, and potential biases in the comparison.",
+      "id": "critique",
+      "description": "Review the analysis for gaps, unsupported claims, and contradictions.",
       "role": "critic",
       "depends_on": [
-       "analyze_comparison"
-      ]
+       "analyze"
+      ],
+      "queries": []
      },
      {
-      "id": "write_brief",
-      "description": "Compose the final cited brief comparing REST and GraphQL with a clear recommendation for a public API.",
+      "id": "write",
+      "description": "Compose the final cited brief comparing REST and GraphQL with a recommendation.",
       "role": "writer",
       "depends_on": [
-       "critique_analysis"
-      ]
+       "critique"
+      ],
+      "queries": []
      }
     ]
    }
   },
-  "ResearchFindings|Gather evidence on GraphQL query efficiency, over-fetching prevention, caching challenges, and client complexity.#0": {
+  "ResearchFindings|Gather performance, caching, and complexity data for GraphQL APIs.#0": {
    "schema": "ResearchFindings",
    "output": {
     "findings": [
      {
-      "source": "https://moldstud.com/articles/p-understanding-graphql-relationships-managing-nested-queries-for-efficient-data-retrieval",
-      "content": "Properly structuring nested queries in GraphQL is crucial for efficient data retrieval to ensure that applications only fetch necessary data, thereby reducing load times and improving performance."
+      "source": "https://wundergraph.com/blog/graphql_doesnt_solve_underfetching_overfetching_but_relay",
+      "content": "A measurement of GraphQL traffic across eight production applications (ranging from 3 requests for a single page up to 42 requests to load a subreddit) found that none of them eliminated underfetching and waterfalls in practice. For example, Nerdwallet made 16 GraphQL requests to load the page for best credit cards, and Priceline's search page made 8 requests sent over HTTP POST without batching or persisted operations."
      },
      {
-      "source": "https://apipark.com/techblog/en/master-gql-fragment-on-boost-your-graphql-query-efficiency/",
-      "content": "Using gql fragment on allows clients to fetch all necessary type-specific data within a single query, adhering to GraphQL's no over-fetching principle even for complex polymorphic structures such as unions."
+      "source": "https://javascript.plainenglish.io/graphql-performance-and-caching-strategies-that-actually-work-611f47588828",
+      "content": "Replacing REST with GraphQL can sometimes move bottlenecks rather than eliminating them, introducing common failure modes such as slow resolvers, redundant network requests, N+1 queries, and broken caches."
      },
      {
-      "source": "https://piembsystech.com/avoiding-over-fetching-and-under-fetching-in-graphql-database/",
-      "content": "Avoiding over-fetching often results in very specific queries with varying fields across different clients or components, which introduces complexity in caching strategies because responses may differ significantly."
+      "source": "https://graphql.org/learn/caching/",
+      "content": "GraphQL lacks a URL-like primitive to provide a globally unique identifier for a given object, making it a best practice for the API to expose such an identifier explicitly so clients can use it as a prerequisite for certain types of caching."
+     },
+     {
+      "source": "https://wundergraph.com/blog/graphql_doesnt_solve_underfetching_overfetching_but_relay",
+      "content": "GraphQL is solely a query language and does not specify how data is fetched or define transport details, meaning claims that it automatically eliminates overfetching, underfetching, and waterfall requests hold only in theory and not in practice."
      }
     ]
    }
   },
-  "ResearchFindings|Gather evidence on REST API architecture, performance, caching, and ecosystem maturity.#0": {
+  "ResearchFindings|Gather performance, caching, and ecosystem data for REST APIs.#0": {
    "schema": "ResearchFindings",
    "output": {
     "findings": [
      {
-      "source": "https://www.ijaidr.com/papers/2023/1/1304.pdf",
-      "content": "A 2023 paper discusses the foundational principles of REST, architectural approaches such as microservices and caching, and explores strategies for secure and performant API design in high-performance applications."
+      "source": "https://ngendevtech.com/blog/graphql-vs-rest-api-performance-benchmarks-for-modern-applications/",
+      "content": "REST outperforms GraphQL by 15-25% for simple queries fetching single resources due to its straightforward request-response cycle having less overhead, whereas GraphQL query parsing and resolution adds 20-40ms of latency for basic operations."
      },
      {
-      "source": "https://ieeexplore.ieee.org/document/10741246",
-      "content": "A November 2024 IEEE evaluation of REST APIs reveals significant differences in performance and computational resource consumption across different frameworks and execution environments, highlighting the necessity of making informed technology choices."
+      "source": "https://ngendevtech.com/blog/graphql-vs-rest-api-performance-benchmarks-for-modern-applications/",
+      "content": "GraphQL typically reduces total bandwidth by 30-50% compared to REST for complex queries by avoiding data over-fetching, and excels with 40-60% faster response times when fetching related data by replacing 3-5 sequential REST calls with a single request."
      },
      {
-      "source": "https://www.researchgate.net/publication/388950588_RESTful_API_Design_and_Implementation_Best_Practices_for_Building_Scalable_and_Maintainable_Web_Services",
-      "content": "A January 2025 publication explores best practices in RESTful API design and implementation, specifically emphasizing scalability, maintainability, and performance optimization for building web services."
+      "source": "https://mecanik.dev/en/posts/rest-api-vs-graphql-which-to-choose-for-your-project-in-2026/",
+      "content": "REST caches naturally at the HTTP layer, allowing GET responses to be cached by CDNs, proxies, and browsers using standard HTTP cache headers as a significant operational advantage for free caching infrastructure."
      },
      {
-      "source": "https://www.logicmonitor.com/deep-dive/api-monitoring-tools/api-architecture",
-      "content": "An April 2026 LogicMonitor guide notes that understanding API architecture involves knowing its layers, comparing types like REST and GraphQL, and applying best practices to keep APIs performant and secure."
+      "source": "https://ngendevtech.com/blog/graphql-vs-rest-api-performance-benchmarks-for-modern-applications/",
+      "content": "REST benefits from decades of mature tooling and established best practices, whereas the GraphQL ecosystem continues evolving with occasional breaking changes, favoring mature technologies for production stability."
      }
     ]
    }
@@ -281,74 +302,137 @@
   "WriterOutput#0": {
    "schema": "WriterOutput",
    "output": {
-    "content": "When deciding between REST and GraphQL for a public API, REST remains the superior choice due to its predictable caching mechanisms and well-established design practices that ensure robust scalability and security [1, 3, 4]. While both paradigms aim to keep APIs performant and secure, they handle data retrieval, architectural maturity, and caching in fundamentally different ways [4].\n\n## Architectural Maturity and Design Principles\n\nREST benefits from decades of established best practices focusing heavily on scalability, maintainability, and microservices integration [1, 3]. Foundational principles of REST include robust strategies for secure and performant API design in high-performance applications [1]. Furthermore, empirical evaluations demonstrate that REST performance and computational resource consumption show significant differences across various frameworks and execution environments, highlighting the necessity of making informed infrastructure and technology choices [2].\n\n## Data Retrieval and Query Flexibility\n\nConversely, GraphQL addresses the specific challenges of over-fetching and under-fetching through flexible client-driven queries and structural patterns [5, 6, 7]. Properly structuring nested queries in GraphQL is crucial for efficient data retrieval, ensuring applications only fetch necessary data to reduce load times and improve performance [5]. Additionally, using constructs like gql fragment on allows clients to fetch all necessary type-specific data within a single query, adhering to GraphQL's no over-fetching principle even for complex polymorphic structures such as unions [6].\n\n## Caching Complexity\n\nThe flexibility that prevents over-fetching in GraphQL introduces substantial complexity in caching strategies [7]. Because responses may vary significantly across different clients or components due to highly specific queries, traditional HTTP caching mechanisms become difficult to apply effectively [7]. REST, by contrast, benefits from a uniform interface that makes traditional caching straightforward and reliable.\n\n## Recommendation\n\nFor a public API, REST is recommended because its predictable caching mechanisms and mature design practices ensure robust scalability, maintainability, and security [1, 3, 4]. In accepting this recommendation, the project trades away the client-side query flexibility and the ability to eliminate over-fetching offered by GraphQL [5, 6, 7], in exchange for simplified infrastructure caching and predictable performance across diverse execution environments [1, 2]. This recommendation would change only if the primary product requirement shifts heavily toward deeply nested, highly variable data structures across diverse client applications where minimizing payload size outweighs caching simplicity.",
+    "content": "Choosing between REST and GraphQL for a public API requires balancing query flexibility against operational maturity, caching simplicity, and performance. For most public APIs, REST is the superior choice due to its robust ecosystem, predictable performance on simple queries, and effortless HTTP-layer caching.\n\n## Performance and Query Complexity\n\nPerformance characteristics vary significantly based on the complexity of the query and the volume of data being requested [1, 2]. For simple queries that fetch single resources, REST outperforms GraphQL by 15-25% because its straightforward request-response cycle has lower overhead. By contrast, GraphQL adds 20-40ms of latency for basic operations due to query parsing and resolution overhead [1]. However, the calculus shifts for complex, highly nested data. GraphQL can reduce total bandwidth by 30-50% by eliminating overfetching and can achieve 40-60% faster response times for related data by consolidating what would be multiple sequential REST calls into a single request [2]. \n\nDespite these theoretical advantages, real-world measurements indicate that GraphQL does not automatically cure waterfalls or underfetching [5, 8]. Traffic analyses of production applications—such as Nerdwallet issuing 16 GraphQL requests for a single page or Priceline issuing 8 unbatched requests over HTTP POST—demonstrate that developers frequently end up issuing multiple requests in practice rather than a single unified query [5]. Furthermore, GraphQL's architecture can introduce unique failure modes, including slow resolvers, redundant network traffic, N+1 query problems, and broken caches [6].\n\n## Operational Maturity and Caching\n\nOperational maturity and caching infrastructure heavily favor REST [3, 4]. REST benefits from decades of established best practices and a mature tooling ecosystem, which provides greater predictability and stability for production environments compared to the continuously evolving GraphQL landscape [4]. More importantly, REST allows for natural HTTP caching. GET responses can be easily cached by web browsers, reverse proxies, and CDNs using standard HTTP cache headers, delivering free and reliable caching infrastructure [3]. \n\nGraphQL, on the other hand, lacks a natural URL-based caching primitive because it relies heavily on POST requests and unique query payloads [3, 7]. It also lacks a built-in mechanism for globally unique object identifiers, requiring explicit API design to support certain types of client-side caching [7]. Consequently, implementing effective caching in GraphQL requires custom architectures that are complex and prone to failure [3].\n\n## Recommendation\n\nFor a public API, REST is recommended due to its mature ecosystem, simpler production stability, and effortless HTTP caching. This recommendation accepts the tradeoff of sacrificing client-side query flexibility and accepting potential over-fetching for simple resources, in exchange for lower base latency, predictable caching behavior via standard CDNs, and reduced operational complexity.",
     "citations": [
-     "https://www.ijaidr.com/papers/2023/1/1304.pdf",
-     "https://ieeexplore.ieee.org/document/10741246",
-     "https://www.researchgate.net/publication/388950588_RESTful_API_Design_and_Implementation_Best_Practices_for_Building_Scalable_and_Maintainable_Web_Services",
-     "https://www.logicmonitor.com/deep-dive/api-monitoring-tools/api-architecture",
-     "https://moldstud.com/articles/p-understanding-graphql-relationships-managing-nested-queries-for-efficient-data-retrieval",
-     "https://apipark.com/techblog/en/master-gql-fragment-on-boost-your-graphql-query-efficiency/",
-     "https://piembsystech.com/avoiding-over-fetching-and-under-fetching-in-graphql-database/"
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
     ]
    }
   }
  },
  "searches": {
-  "Gather evidence on REST API architecture, performance, caching, and ecosystem maturity.": [
+  "REST API performance advantages caching": [
    {
-    "title": "Architecting REST APIs for High-Performance Applications",
-    "href": "https://www.ijaidr.com/papers/2023/1/1304.pdf",
-    "body": "This paper discusses the foundational principles of REST, covers architectural approaches such as microservices and caching, and explores strategies for secure and performant API design."
+    "title": "GraphQL vs REST API: Performance Benchmarks for Modern...",
+    "href": "https://ngendevtech.com/blog/graphql-vs-rest-api-performance-benchmarks-for-modern-applications/",
+    "body": "API architecture decisions significantly impact application performance and development velocity. REST has dominated web APIs for over two decades with proven stability. GraphQL emerged promising to solve REST’s limitations through flexible queries."
    },
    {
-    "title": "API Architecture Patterns and Best Practices - LogicMonitor",
-    "href": "https://www.logicmonitor.com/deep-dive/api-monitoring-tools/api-architecture",
-    "body": "Apr 1, 2026 · Understanding API architecture means knowing its layers, types like REST and GraphQL, and the best practices that keep APIs performant and secure."
+    "title": "REST API vs GraphQL in 2026 - How to Choose the Right One",
+    "href": "https://mecanik.dev/en/posts/rest-api-vs-graphql-which-to-choose-for-your-project-in-2026/",
+    "body": "REST’s caching advantages are understated in most comparisons. The ability to put a CDN in front of your API and cache GET responses aggressively is genuinely powerful. Many high-traffic applications serve the majority of their traffic from cache, and REST makes that simple."
    },
    {
-    "title": "Evaluating Performance and Resource Consumption of REST ...",
-    "href": "https://ieeexplore.ieee.org/document/10741246",
-    "body": "Nov 1, 2024 · Our results reveal significant differences in performance and computational resource consumption across different frameworks and execution environments, highlighting the necessity of making informed technology choices based on thorough analysis rather than convenience or familiarity."
+    "title": "GraphQL vs REST: Which API Optimization is Easy? | Medium",
+    "href": "https://mobilelive.medium.com/graphql-vs-rest-which-api-optimization-is-easy-6e4bc48f0b1f",
+    "body": "Graphql vs REST: A Comparative Analysis. Graphql: Revolutionizing API Communication. Graphql, a query language for APIs, has gained significant traction in recent years. It introduces a novel way of fetching data by allowing clients to request exactly what they need."
    },
    {
-    "title": "RESTful API Design and Implementation: Best Practices for ...",
-    "href": "https://www.researchgate.net/publication/388950588_RESTful_API_Design_and_Implementation_Best_Practices_for_Building_Scalable_and_Maintainable_Web_Services",
-    "body": "Jan 13, 2025 · The objective of this paper is to explore the best practices in RESTful API design and implementation, emphasizing scalability, maintainability, and performance optimization."
+    "title": "Magento Headless API: Performance Guide 2026 - AgileSoftLabs Blog",
+    "href": "https://www.agilesoftlabs.com/blog/2026/02/magento-headless-api-performance-guide",
+    "body": "REST API Key Advantages for Headless Magento.REST API optimization — field selection, caching, batch operations, and performance tuning. Security hardening — OAuth setup, CORS, rate limiting, WAF configuration, and audit logging."
    },
    {
-    "title": "Next-Level REST Concepts: Idempotency, Caching, and Beyond",
-    "href": "https://dev.to/cathylai/next-level-rest-concepts-idempotency-caching-and-beyond-4gfc",
-    "body": "Oct 16, 2025 · In the previous article we explored the fundamentals of RESTful APIs --- how to design clean... Tagged with api, architecture, backend."
+    "title": "GraphQL vs REST API Performance Benefits | Khawaja... | LinkedIn",
+    "href": "https://www.linkedin.com/posts/atillawall_graphql-restapi-webdevelopment-activity-7482353244661534720-6Fd8",
+    "body": "Why GraphQL over REST? GraphQL lets clients request exactly the data they need—nothing more, nothing less. This reduces over-fetching, minimizes network requests, and improves application performance, especially for modern web and mobile applications."
    }
   ],
-  "Gather evidence on GraphQL query efficiency, over-fetching prevention, caching challenges, and client complexity.": [
+  "GraphQL public API challenges overfetching": [
    {
-    "title": "How to avoid over-fetching in GraphQL queries | LinkedIn",
-    "href": "https://www.linkedin.com/posts/koshal-b63626312_graphql-optimization-performance-activity-7342521764305895424-nVDT",
-    "body": "## GraphQL Gotcha: Over-Fetching! Is your GraphQL query fetching *more* data than your component needs? * What's your take on GraphQL? Have you found it to be a game-changer or a source of new challenges? I'd love to hear your thoughts and ..."
+    "title": "graphql - What is Over-Fetching or Under-fetching? - Stack ...",
+    "href": "https://stackoverflow.com/questions/44564905/what-is-over-fetching-or-under-fetching",
+    "body": "Jun 15, 2017 · GraphQL fixes this problem because it allows you to request which data you want from the server. You specify what you need and will get this data, and only this data, in one trip to the server."
    },
    {
-    "title": "Understanding GraphQL Relationships - Managing Nested Queries for...",
-    "href": "https://moldstud.com/articles/p-understanding-graphql-relationships-managing-nested-queries-for-efficient-data-retrieval",
-    "body": "Properly structuring nested queries in GraphQL is crucial for efficient data retrieval. This ensures that you only fetch the necessary data, reducing load times and improving performance. Define parent-child relationships. Use clear naming conventions."
+    "title": "GraphQL doesn't solve under & overfetching, Relay ...GraphQL Doesn't Solve Under & Overfetching - HackerNoonGraphQL doesn't solve under & overfetching, Relay ...Why GraphQL: Solving REST's Over-Fetching and Under-FetchingAPI under-fetching, and over-fetching mitigation | by Nnamdi ...",
+    "href": "https://wundergraph.com/blog/graphql_doesnt_solve_underfetching_overfetching_but_relay",
+    "body": "May 12, 2023 · GraphQL is a query language. It does not specify how data is fetched, and the specification says little about transport, so the claim that it eliminates overfetching, underfetching, and waterfall requests holds in theory and not in practice. May 15, 2023 · Overfetching is the problem of fetching more data than you need. GraphQL advocates usually attribute this problem to REST APIs. REST APIs are often designed to be generic and reusable across different use cases, so it's not uncommon that a REST API returns more data than you actually need. May 18, 2023 · Overfetching is the problem of fetching more data than you need. GraphQL advocates usually attribute this problem to REST APIs. so it's not uncommon that a REST API returns more data than you actually need. It's widely known that GraphQL has a native solution to this problem. Oct 11, 2026 · Explain, with a concrete example, what over-fetching and under-fetching mean in a REST API, and describe how GraphQL's single-endpoint, client-specified-shape model addresses both without requiring a proliferation of specialized REST endpoints. Feb 22, 2024 · What is Over-Fetching? Over fetching in the context of direct REST API calls refers to a situation where the API response includes more data than what the client actually needs."
    },
    {
-    "title": "Optimizing GraphQL: Avoiding Over-fetching and... - Java Code Geeks",
-    "href": "https://www.javacodegeeks.com/2024/11/optimizing-graphql-avoiding-over-fetching-and-under-fetching.html",
-    "body": "Discover effective strategies for optimizing GraphQL queries to avoid over-fetching and under-fetching enhancing your application."
+    "title": "GraphQL Doesn't Solve Under & Overfetching - HackerNoon",
+    "href": "https://hackernoon.com/graphql-doesnt-solve-under-and-overfetching",
+    "body": "May 15, 2023 · Overfetching is the problem of fetching more data than you need. GraphQL advocates usually attribute this problem to REST APIs. REST APIs are often designed to be generic and reusable across different use cases, so it's not uncommon that a REST API returns more data than you actually need."
    },
    {
-    "title": "Master `gql fragment on`: Boost Your GraphQL Query Efficiency",
-    "href": "https://apipark.com/techblog/en/master-gql-fragment-on-boost-your-graphql-query-efficiency/",
-    "body": "This elegant solution allows clients to fetch all necessary type-specific data within a single query, adhering to GraphQL's \"no over-fetching\" principle even for complex polymorphic structures. Example 2: Querying a Union (SearchResult)."
+    "title": "GraphQL doesn't solve under & overfetching, Relay ...",
+    "href": "https://dev.to/slickstef11/graphql-doesnt-solve-under-overfetching-relay-wundergraph-does-e2a",
+    "body": "May 18, 2023 · Overfetching is the problem of fetching more data than you need. GraphQL advocates usually attribute this problem to REST APIs. so it's not uncommon that a REST API returns more data than you actually need. It's widely known that GraphQL has a native solution to this problem."
    },
    {
-    "title": "Avoiding Over-Fetching and Under-Fetching in GraphQL Database...",
-    "href": "https://piembsystech.com/avoiding-over-fetching-and-under-fetching-in-graphql-database/",
-    "body": "Complexity in Caching Strategies: Avoiding over-fetching often results in very specific queries with varying fields across different clients or components. This variability makes it harder to implement effective caching strategies since responses may differ significantly."
+    "title": "Why GraphQL: Solving REST's Over-Fetching and Under-Fetching",
+    "href": "https://naveedkarimi.com/learn/courses/api-design/14-why-graphql-solving-rest-s-over-fetching-and-under-fetching.html",
+    "body": "Oct 11, 2026 · Explain, with a concrete example, what over-fetching and under-fetching mean in a REST API, and describe how GraphQL's single-endpoint, client-specified-shape model addresses both without requiring a proliferation of specialized REST endpoints."
+   }
+  ],
+  "REST API best practices public use cases": [
+   {
+    "title": "Designing Robust REST APIs with Best Practices | LinkedIn",
+    "href": "https://www.linkedin.com/posts/brightseotools_how-to-design-a-rest-api-best-practices-activity-7475401656331894785-xFSO",
+    "body": "When designing a REST API, following proven best practices can save countless hours of maintenance and integration challenges later. Key principles include using clear resource-based URLs, proper HTTP methods, consistent naming conventions, meaningful status codes..."
+   },
+   {
+    "title": "Why Smart Engineers Build Dumb APIs (And Why It’s a Good Thing)",
+    "href": "https://medium.com/javarevisited/why-smart-engineers-build-dumb-apis-and-why-its-a-good-thing-93c20b8a96ea",
+    "body": "REST API BEST PRACTICES #5.How to Build Better APIs. instead of guessing the future, follow these rules: Use API versioning for breaking changes. Use optional fields instead of big changes. Solve Problems when they happen."
+   },
+   {
+    "title": "Unconventional Yet Powerful REST API Best Practices You...",
+    "href": "https://javascript.plainenglish.io/unconventional-yet-powerful-rest-api-best-practices-you-havent-tried-yet-but-should-part-2-7eb11d8c90de",
+    "body": "Whether you're a beginner or a seasoned backend engineer, these 8 powerful REST API tips for Node.js and NestJS will help you improve performance, reduce bugs, handle edge cases, and boost scalability—ensuring your APIs are production-grade and developer-friendly."
+   },
+   {
+    "title": "Best Practices for REST API Error Handling | Baeldung",
+    "href": "https://www.baeldung.com/rest-api-error-handling-best-practices",
+    "body": "Learn about some of the best practices for handling REST API errors, including useful approaches for providing users with additional relevant information."
+   },
+   {
+    "title": "GitHub - ytanne/best-practices",
+    "href": "https://github.com/ytanne/best-practices",
+    "body": "Contribute to ytanne/best-practices development by creating an account on GitHub.Use saved searches to filter your results more quickly."
+   }
+  ],
+  "GraphQL caching strategies performance benchmarks": [
+   {
+    "title": "Building a Custom GraphQL Cache Implementation | Medium",
+    "href": "https://medium.com/@vinaybilla2021/building-a-custom-graphql-cache-implementation-b72c01007781",
+    "body": "2. Caching Strategies for GraphQL6. GraphQL Cache Benchmarking & Performance Gains2. Caching Strategies for GraphQL. There are multiple ways to cache GraphQL responses"
+   },
+   {
+    "title": "Caching | GraphQL",
+    "href": "https://graphql.org/learn/caching/",
+    "body": "In GraphQL, there’s no URL-like primitive that provides this globally unique identifier for a given object. Hence, it’s a best practice for the API to expose such an identifier for clients to use as a prerequisite for certain types of caching."
+   },
+   {
+    "title": "GraphQL Performance and Caching Strategies That Actually Work",
+    "href": "https://javascript.plainenglish.io/graphql-performance-and-caching-strategies-that-actually-work-611f47588828",
+    "body": "GraphQL promises flexibility, but performance is not free. Many teams discover too late that replacing REST with GraphQL simply moved their bottlenecks instead of eliminating them. Slow resolvers, redundant network requests, N+1 queries, and broken caches are common failure modes."
+   },
+   {
+    "title": "GraphQL vs REST: 18 Claims Fact-Checked with... - WunderGraph",
+    "href": "https://wundergraph.com/blog/fact-checking-graphql-vs-rest",
+    "body": "GraphQL vs REST Performance: What Benchmarks Actually Show. Claim 7: \"REST delivers nearly half the latency and 70% more requests per second\". Verdict: Context-dependent and often misapplied."
+   },
+   {
+    "title": "Caching in GraphQL: How to prevent excessive and... | daily.dev",
+    "href": "https://daily.dev/blog/caching-in-graphql/",
+    "body": "Learn how caching can be used to cache GraphQL requests to prevent excessive and unnecessary requests. Explore practical developer news, tutorials, and tools read by millions of developers worldwide."
    }
   ]
+ },
+ "pages": {
+  "https://mobilelive.medium.com/graphql-vs-rest-which-api-optimization-is-easy-6e4bc48f0b1f": null,
+  "https://mecanik.dev/en/posts/rest-api-vs-graphql-which-to-choose-for-your-project-in-2026/": "REST API vs GraphQL in 2026 - How to Choose the Right OneSkip to content\nSearch interest in “REST vs GraphQL” has remained consistently high throughout the 2020s, with the debate gaining renewed urgency as more teams build frontend-heavy products with complex data requirements. GraphQL has been in production since Facebook open-sourced it in 2015 and is now mature, well-tooled, and genuinely adopted at scale. Yet REST remains the dominant choice for new APIs in 2026, and not without reason. The question is not which one is theoretically better but which one fits your project.\nThis guide covers what each approach actually is, the core technical differences with a concrete code example, performance realities that the marketing does not mention, security considerations that change the calculus, and a clear recommendation for each scenario type. By the end you will have a decision framework rather than another inconclusive comparison.\nREST is the right default for most projects in 2026: simpler to implement, easier to document, better HTTP caching, and widely understood by external consumers\nGraphQL justifies its complexity when you have a genuinely complex data graph, multiple clients with different data needs, or a frontend team that needs to iterate without backend changes\nGraphQL’s N+1 query problem and caching challenges are real production costs that most comparisons understate; plan for DataLoader and persisted queries from day one\nIf you are building a public API for third-party developers, REST wins on discoverability and tooling availability; GraphQL shines for internal APIs where you control both ends\nREST (Representational State Transfer) is an architectural style, not a protocol. Roy Fielding defined it in his 2000 doctoral dissertation as a set of constraints for distributed hypermedia systems. In practice, a RESTful API means: stateless communication over HTTP, resource-oriented URLs, standard HTTP verbs (GET, POST, PUT, PATCH, DELETE) to indicate intent, and standard HTTP status codes to communicate outcomes.\nA REST endpoint for a user resource looks like GET /api/v1/users/123. The server returns a representation of that resource. The client does not tell the server what fields it wants; the server decides what to include in the response. The API is versioned in the URL (/v1/, /v2/) when breaking changes require it.\nWhat REST is not: a standard with a formal specification. Two REST APIs can behave very differently while both being technically “RESTful.” This is why OpenAPI (formerly Swagger) has become the de facto documentation and validation layer for REST APIs. It is not required, but a well-maintained OpenAPI spec is the closest thing REST has to a formal contract.\nGraphQL is a query language for APIs and a runtime for executing those queries. The key distinction from REST is that the client specifies exactly what data it wants, not the server. A single GraphQL endpoint (typically POST /graphql) accepts queries written in the GraphQL query language and returns precisely the fields requested.\nGraphQL requires a typed schema that describes every type in your data model and every query, mutation, and subscription available. This schema is the contract between client and server. Introspection allows clients to query the schema itself to discover what is available, which powers excellent developer tooling.\nDeveloped by Facebook to solve the data-fetching challenges of their mobile app in 2012, it was open-sourced in 2015 and is now governed by the GraphQL Foundation. Major users include GitHub, Shopify, Twitter, and Airbnb. It is a mature, production-proven technology with a strong ecosystem.\nREST returns the entire resource representation defined by the server. If the /api/users/123 endpoint returns 20 fields and you only need 3, you receive all 20. GraphQL returns exactly the fields you request. Nothing more.\nThis matters most on mobile clients where bandwidth is constrained and payload size directly affects performance. It matters less for internal server-to-server communication where the full object is often useful.\nREST typically requires one HTTP request per resource. To fetch a user and their associated orders and each order’s product details, you make three separate requests: one for the user, one for their orders, one for the products. Each is a round-trip.\nGraphQL resolves related data in a single request. A single query can traverse the data graph and return deeply nested related entities without additional round-trips.\nOver-fetching is receiving more data than you need. Under-fetching is receiving too little, requiring additional requests. REST APIs optimised for one client tend to over-fetch for another. Mobile apps often under-fetch from endpoints designed for web clients.\nGraphQL eliminates both problems by design: the client specifies exactly what it needs.\nGraphQL has a mandatory strongly-typed schema. Every type, field, argument, and return value is declared. The schema is the source of truth and enables static analysis, code generation, and excellent IDE support.\nREST relies on OpenAPI for typing, which is optional. Many REST APIs exist without any formal schema, which means consumers have to read documentation (if it exists) rather than interrogate the API directly.\nREST APIs are typically versioned in the URL: /v1/users, /v2/users. This is explicit and easy to understand, but it creates parallel API versions that must be maintained simultaneously during deprecation periods.\nGraphQL deprecates fields in the schema using the @deprecated directive rather than creating new URL versions. Clients that use deprecated fields continue to work; tooling surfaces the deprecation warning. This is cleaner in theory, though managing a large schema with many deprecated fields has its own complexity.\nREST caches naturally at the HTTP layer. A GET /api/users/123 response can be cached by CDNs, proxies, and browsers using standard HTTP cache headers. This is one of REST’s most significant operational advantages: you get caching infrastructure for free.\nGraphQL uses POST by default (queries include the query string in the body), which is not natively cacheable at the HTTP layer. Persisted queries (where the client sends a query hash rather than the full query text, enabling GET requests for cacheable queries) solve this but require additional implementation effort. Apollo and similar clients support persisted queries, but it is not automatic.\nCode Example: The Same Data in REST vs GraphQL\nConsider fetching a user with their recent orders. Here is how each approach handles it.\n15Response: [ { \"id\": 901, \"total\": 49.99, \"status\": \"shipped\", ... }, ... ]\n18Response: [ { \"product_id\": 42, \"name\": \"Widget Pro\", \"qty\": 2 }, ... ]\nThe GraphQL version returns exactly the fields specified (no created_at, no preferences, no role) and resolves all three data sources in one HTTP round-trip. For a mobile client on a slow connection, this is a meaningful advantage.\nPerformance Reality: What the Marketing Leaves Out\nGraphQL’s data fetching efficiency is real, but production GraphQL has a well-known performance problem: the N+1 query problem in resolvers.\nWhen a GraphQL resolver fetches a list of users and each user has an orders field, a naive implementation will fire one database query to fetch N users, then N individual queries to fetch each user’s orders. For 100 users that is 101 database queries for what should be 2.\nThe solution is DataLoader, a batching and caching utility that groups individual lookups into batch queries. DataLoader is not optional for production GraphQL; it is a required implementation step. Every list field in your schema that resolves related data needs DataLoader configured correctly, or your database will suffer under real load.\nREST does not have this problem. Each endpoint makes the queries it needs, typically with a single JOIN or a small number of coordinated queries designed by the developer who wrote the endpoint.\nThe other performance consideration is query complexity. GraphQL allows clients to construct arbitrarily deep queries. A malicious or poorly designed client can send a query that traverses deeply nested relationships and triggers enormous database load. Query depth limiting and query complexity scoring are required security and performance measures for any public-facing GraphQL API.\nREST has a simpler security model. Each endpoint is a discrete surface that can have its own middleware: authentication checks, authorisation rules, rate limiting, input validation. A route-level middleware stack means the security logic for POST /api/orders is self-contained and auditable.\nGraphQL’s single endpoint model means all access flows through one point. Authorisation must be implemented at the resolver level, and it is easy to miss. If a user type exposes an adminNotes field and the resolver does not check the caller’s role, that field is accessible to anyone who knows to ask for it. Field-level authorisation libraries (such as graphql-shield) exist, but they require deliberate implementation rather than being the natural structure of the code.\nQuery abuse is a significant concern for public GraphQL APIs. Without depth limiting and query complexity scoring, a single malicious query can trigger a denial of service. Apollo Server and other runtimes provide these controls, but they must be configured explicitly.\nIntrospection, which is excellent for developer tooling in development, should be disabled in production for public APIs. It allows anyone to enumerate your entire schema, which is useful intelligence for an attacker mapping your data model.\nREST vs GraphQL: Side-by-Side Comparison\nREST is the right choice in the following scenarios.\nSimple CRUD operations. If your API is mostly create/read/update/delete operations on discrete resources without complex relationships, REST’s resource-oriented model is a natural fit. The overhead of a GraphQL schema is not justified.\nPublic APIs with external consumers. REST APIs are universally understood. Any developer, in any language, can consume a REST API with a basic HTTP client. GraphQL requires either a GraphQL client library or knowledge of the query syntax. For APIs consumed by third-party developers, REST’s discoverability and simplicity are material advantages.\nWhen HTTP caching is important. If CDN caching, browser caching, or edge caching is part of your performance architecture, REST’s native GET-based caching is a significant advantage over GraphQL’s additional complexity.\nTeams without GraphQL experience. GraphQL has a real learning curve: schema design, resolver architecture, DataLoader, query complexity management, persisted queries. If your team does not have experience with it, the productivity cost during adoption is real and should not be dismissed.\nMicroservices communicating internally. Service-to-service communication within a backend system rarely benefits from GraphQL’s client-defined queries. Each service typically knows exactly what it needs from another service, making REST’s fixed-contract model more appropriate.\nGraphQL justifies its complexity in specific circumstances.\nComplex data graphs with many relationships. Social networks, product catalogues with deep attribute hierarchies, content management systems with complex relationship models: these are the problem spaces GraphQL was designed for. When your data looks like a graph rather than a table, GraphQL’s query model is a natural fit.\nMobile clients where bandwidth matters. Fetching only the fields a screen needs, combining multiple related queries into one request, and avoiding over-fetching are all meaningful on mobile. Facebook built GraphQL specifically because their mobile app was suffering under REST’s data transfer overhead.\nMultiple consumers with different data needs. A web app, a mobile app, and a third-party integration may all need different subsets of the same underlying data. With REST you either buil",
+  "https://ngendevtech.com/blog/graphql-vs-rest-api-performance-benchmarks-for-modern-applications/": "GraphQL vs REST API: Performance Benchmarks for Modern Applications - Web and Mobile App Development Company - NGD Technolab GraphQL vs REST API: Performance Benchmarks for Modern Applications\nGraphQL vs REST API: Performance Benchmarks for Modern Applications\nHome » Blog » GraphQL vs REST API Performance\nGraphQL vs REST API: Performance Benchmarks for Modern Applications\nAPI architecture decisions significantly impact application performance and development velocity. REST has dominated web APIs for over two decades with proven stability. GraphQL emerged promising to solve REST’s limitations through flexible queries. In 2026, both approaches power successful applications making the choice less obvious than advocates suggest. Performance differences vary dramatically based on use cases and implementation quality. Many organizations rush to GraphQL chasing perceived benefits without understanding trade-offs. Real-world benchmarks reveal surprising results contradicting common assumptions. This guide examines actual performance data from production applications comparing GraphQL and REST.\nUnderstanding Core Architectural Differences\nPerformance implications stem from fundamental design philosophies.\nREST APIs expose resources through fixed endpoints returning predetermined data structures. Clients receive complete resource representations regardless of actual needs. Multiple endpoints are called sequentially for related data creating network round-trips.\nGraphQL provides single endpoint accepting queries specifying exact data requirements. Servers return precisely requested fields eliminating over-fetching. Related data loads in single request through nested queries reducing round-trips.\nGraphQL typically reduces total bandwidth by 30-50% compared to REST for complex queries. REST often over-fetches data clients discard wasting bandwidth. However, GraphQL query parsing adds server-side computational overhead REST avoids.\nReal measurements from production applications reveal actual performance characteristics.\nREST outperforms GraphQL by 15-25% for simple queries fetching single resources. REST’s straightforward request-response cycle has less overhead. GraphQL’s query parsing and resolution add 20-40ms latency for basic operations.\nGraphQL excels with 40-60% faster response times when fetching related data. Single GraphQL request replaces 3-5 sequential REST calls eliminating round-trip delays. Network latency dominates performance making GraphQL’s aggregation valuable.\nREST with Server-Sent Events performs comparably to GraphQL subscriptions. GraphQL subscriptions add complexity without significant performance advantages. WebSocket implementations perform similarly regardless of underlying protocol.\nNetwork efficiency differs significantly between approaches across scenarios.\nREST endpoints typically return 40-70% more data than clients actually need. Mobile applications on limited data plans suffer from unnecessary data transfer. Bandwidth costs increase proportionally with over-fetched data.\nUnder-fetching requiring multiple requests\nREST clients often need 2-4 sequential requests gathering complete data. Each request adds network round-trip latency compounding delays. Mobile networks with high latency particularly suffer from multiple round-trips.\nWell-designed GraphQL queries eliminate both over-fetching and under-fetching. Query complexity must be monitored preventing abusive queries degrading performance. Poorly written GraphQL queries can perform worse than REST alternatives.\nGraphQL query parsing and resolution increases CPU usage 20-35% compared to REST. Complex queries with deep nesting amplify computational requirements. REST’s simpler processing reduces server infrastructure costs.\nGraphQL servers typically consume 15-25% more memory caching schemas and resolvers. Memory usage scales with query complexity and concurrent requests. REST’s stateless nature keeps memory overhead predictable and lower.\nREST’s URL-based caching integrates seamlessly with HTTP infrastructure and CDNs. GraphQL caching requires sophisticated solutions like persisted queries. Traditional HTTP caching provides significant performance benefits REST leverages naturally.\nGraphQL enables frontend teams to iterate 30-40% faster without backend changes. Flexible queries eliminate waiting for new endpoints during feature development. Type-safe GraphQL clients catch errors during development reducing bugs.\nGraphQL backends require 25-40% more initial development time than REST. Schema design and resolver implementation adds complexity. REST’s simplicity enables faster backend iteration in early stages.\nGraphQL’s introspection provides self-documenting APIs reducing documentation burden. REST requires manual documentation maintenance creating consistency challenges. API versioning is simpler in REST while GraphQL enables gradual evolution.\nAlso Read:- Dark Mode and Theme Customization: Technical Implementation Guide\nLet's Build Something Just as Great — For Your Business.\nFrom web & mobile apps to UI/UX, AI solutions, and digital marketing — NGD Technolab turns ideas into scalable, real-world products. 14+ years, 550+ projects, one team you can rely on.\nReal-World Implementation Considerations\nREST integrates seamlessly with established HTTP infrastructure and monitoring tools. GraphQL requires specialized tooling for logging, monitoring, and debugging. Migration costs must be considered beyond pure performance metrics.\nREST’s simplicity allows faster team onboarding and knowledge transfer. GraphQL requires significant learning investment before productive implementation. Available talent pool for REST development is substantially larger.\nREST benefits from decades of mature tooling and established best practices. GraphQL ecosystem continues evolving with occasional breaking changes. Production stability considerations favor mature technologies.\nIn the realm of mobile app development, choosing the right tools is crucial for success. Flutter, React Native, Ionic, Xcode, and Swift each offer unique advantages that cater to different project requirements. Consider your project’s scope, target platforms, and your development team’s skillset when making your decision. With the power of these tools, you’re well-equipped to embark on an app-building journey that yields optimal results.\nWhich API style performs better for mobile applications?\nGraphQL generally performs better for mobile apps by reducing bandwidth usage and round-trips. REST works well for simple mobile apps with straightforward data needs. Mobile network latency makes GraphQL’s single-request advantage particularly valuable.\nHow do caching strategies differ between GraphQL and REST?\nREST leverages standard HTTP caching with CDN support providing significant performance benefits. GraphQL requires specialized caching solutions like Apollo Client or persisted queries. REST’s caching advantage is substantial for read-heavy applications.\nWhat is the performance impact of GraphQL N+1 query problems?\nPoorly implemented GraphQL resolvers can make hundreds of database queries for single request. N+1 problems degrade performance by 10-100x compared to optimized queries. DataLoader and query batching solve N+1 issues restoring performance.\nDo GraphQL subscriptions perform better than REST webhooks?\nPerformance is comparable as both use WebSockets for real-time communication. GraphQL subscriptions provide better developer experience with unified API. REST webhooks are simpler to implement and debug.\nShould existing REST APIs be migrated to GraphQL?\nMigration should be driven by specific problems GraphQL solves, not trend-following. Incremental adoption using both APIs strategically is often optimal. Complete migration rarely justifies costs unless REST limitations cause significant issues.\nExplore the Latest Blogs on Trends and Technology.\nHow to Protect Your App From Hackers: A Beginner’s Checklist\nWhich Mobile Technology Should You Pick? Pick Simply by App Type\nHow to Get Your First 100 Users After Launching an App\nHospital & Healthcare Management Platform\nBanking & Financial Operations Platform: A Case Study\nFleet & Truck Transport Management System\nBook a FREE 30-minute consultation with our experts and take the next step toward your growth.\nNo obligation. Response within 24 hours.\nTurn Your Idea Into a Market-Ready Digital Product\nNGD Technolab is your end-to-end digital partner — from web & app development to UI/UX design and digital marketing — helping you build, launch, and grow faster with expert teams and ongoing support.\nRecognized as Top App Developers by Clutch.\nAvailable on Google Play with 300+ Published\nA dev team with in-depth knowledge & customer understanding.\nEarned 98% job success & \"Top-Rated Plus\" badge on Upwork.",
+  "https://stackoverflow.com/questions/44564905/what-is-over-fetching-or-under-fetching": null,
+  "https://wundergraph.com/blog/graphql_doesnt_solve_underfetching_overfetching_but_relay": "GraphQL doesn't solve under & overfetching, Relay & WunderGraph do - WunderGraph\nState of Federation 2026Share your insights on GraphQL Federation.Take the Survey→\nLast updated on August 3, 2026 by Brendan Bondurant\nHow are teams governing schema changes, handling production traffic, and measuring Federation success? Share your experience and get early access to the full report. For every valid survey completed, we'll donate $30 to UNICEF .\nGraphQL is a query language. It does not specify how data is fetched, and the specification says little about transport, so the claim that it eliminates overfetching, underfetching, and waterfall requests holds in theory and not in practice. This post measures the GraphQL traffic of eight production applications, ranging from 3 requests for a single page to 42 to load a subreddit, and finds none that eliminates underfetching and waterfalls. Three things have to change: clients need to encourage fragments so nested components declare their own data and get hoisted into one query, servers need to return relationships between types instead of IDs, and both ends need to support persisted operations.\nWhen you look at positive articles about GraphQL, you often hear how much better it is than REST and how it solves the problem of overfetching, underfetching and eliminates waterfalls, but is that really true?\nLet's explain the terms, look at the problems and evaluate if GraphQL does what we hear in all the praises of the Query language.\nYou'll learn that GraphQL does not solve the problems of overfetching, underfetching and waterfalls. It's not even close to solving these problems. Read on to understand why this is the case and how we can get the full benefits of GraphQL.\nOverfetching is the problem of fetching more data than you need. GraphQL advocates usually attribute this problem to REST APIs. REST APIs are often designed to be generic and reusable across different use cases, so it's not uncommon that a REST API returns more data than you actually need.\nIt's widely known that GraphQL has a native solution to this problem. Through the use of the Selection Set, you can specify exactly which fields you need. So, in theory, it's possible to solve the problem of overfetching with GraphQL. However, we'll see later that this often stays a theory and doesn't work in practice.\nFurthermore, the claim that REST APIs cannot solve this problem is also not true. You can use sparse fieldsets to achieve similar functionality in REST APIs.\nThe problem with this approach is that it's not standardized and not widely used compared to Selection Sets in GraphQL.\nIn addition to overfetching, GraphQL also claims to solve the problem of underfetching. Underfetching is the problem of not fetching enough data in a single request. This problem is often attributed to REST APIs as well.\nIn order to load all the data you need to present a page, you have to make a lot of requests, simply because a single request doesn't return all the data you need. This problem comes from the fact that REST APIs are usually too granular, which they have to be in order to be reusable.\nWhen listening to GraphQL advocates, it seems like GraphQL solves this problem as well. You can simply specify all the data you need in a single Query and the GraphQL server will return all the required data in a single response. Again, this works in theory, but does it work in practice?\nWhat is the problem with waterfall requests?\nIf we look at the problem of underfetching, what actually is the consequence of this problem? How does it manifest itself in a real-world application?\nFrom the user's perspective, it's quite undesirable to have to wait a long time until the page is loaded. This is even worse when the page loads incrementally over a period of 10-15 seconds.\nImagine a website with a lot of nested components, each building on top of each other. In order to render the page, you have to fetch data for each component. This means that you have to wait for the data of the first component to be fetched before you can fetch the data for the second component. This results in a long \"waterfall\" of requests because we can only render a child component when the data for the parent component is available, which in turn can only be fetched when the data for the grandparent component is available and that component can be rendered.\nThe waterfall usually looks something like this:\nThis is a very simplified example, but it illustrates the problem quite well.\nLuckily, with GraphQL we don't have the problems of waterfall requests, right? Let's look at a few examples.\nReal-world examples of GraphQL Underfetching, Overfetching & Waterfall requests\nTo better understand if the claims we hear about GraphQL are true, let's look at a few real-world examples.\nIf you want to follow along, follow the URLs, open the browser's network tab and have a look at the traffic.\nExample 1: Reddit - 42 GraphQL requests to load a subreddit\nReddit is the first example we'll look at. Let's take a look at the GraphQL Subreddit . We can count 42 requests, including preflight requests, so let's just count 21 actual requests.\nReddit uses persisted operations and sends the operation ID in the POST request body. The waterfall is huge.\nExample 2: Twitter - 6 GraphQL requests to load the home page\nTwitter is quite advanced, actually. If we look at the home page , we can see a few things.\nThe website makes 6 requests and uses persisted operations. Read requests leverage GET and the operation ID and variables are sent in the query string. Quite good, but still a waterfall of 6 requests.\nExample 3: twitch.tv - 16 GraphQL requests to load the home page\nLooking at twitch, we can see that their home page makes 16 requests. Twitch uses persisted operations and batching, so the 16 requests actually translate to a total of 32 requests.\nExample 4: Glassdoor - 3 GraphQL requests to load the member home page\nNext up, we have the Glassdoor member home page . In the network tab, we can see 3 HTTP POST requests, which are GraphQL requests without persisted operations, but they are using batching, so the 3 requests translate to a total of 7 GraphQL Operations.\nExample 5: Nerdwallet - 16 GraphQL requests to load the page for best credit cards\nAnother example, Nerdwallet best credit cards , makes 16 requests to an endpoint they call \"supergraph\", which might indicate what architecture they use. No persisted operations, no batching, all HTTP POST over HTTP/3.\nExample 6: Peleton - 3 GraphQL requests to load the bike page\nPeleton's bike page makes 3 requests. They send regular GraphQL requests over HTTP POST without persisted operations or batching. I noticed that they have 2 different GraphQL endpoints.\nExample 7: Priceline - 8 GraphQL requests to load a search page\nThe Search Page of Priceline makes 8 requests. They don't use persisted operations and send GraphQL requests over HTTP POST without batching.\nExample 8: Facebook - 10 GraphQL requests to load the home page\nFacebook's home page makes 10 requests. I would have expected less, but have a look yourself. They are sending persisted operations over HTTP POST.\nSummary of my findings in real-world GraphQL applications\nTo summarize my findings, I was unable to find a single website that eliminates the problem of underfetching and waterfall requests. Given the amount of GraphQL requests I've seen, it's also quite likely that a lot of the pages suffer from overfetching as well, I'll explain this in more detail later.\nGraphQL does not solve the problem of overfetching, underfetching and waterfall requests\nAnother observation is that most companies use a different style of GraphQL. Some use persisted operations, some use batching, some use both, some use neither. I found different ways of structuring URLs, some use query strings, some use the request body with HTTP POST. There is no real standard, and you might be wondering why.\nWhy does GraphQL fail to solve underfetching and overfetching in practice?\nWhat's often forgotten is that GraphQL is just a Query language. It doesn't specify how the data is fetched. The GraphQL specification doesn't say much about the transport layer, it's really just a specification for the Query language itself.\nSo, in theory GraphQL has the capability to solve the problem of underfetching and overfetching, but it takes more than just the Query language to solve these problems. We need a client-server architecture combined with a workflow that encourages us to reduce the number of requests per page.\nLet's break down the problem into smaller pieces.\nGraphQL clients need to encourage the use of Fragments\nWhen using GraphQL, there are two ways to specify the data you need. You can either specify the data with a Query at the top of the component tree, or you can use Fragments to specify the data at the component level.\nClients like Relay encourage the use of Fragments, allowing deeply nested components to specify what data they need. These fragments are then hoisted to the top of the component tree and combined into a single query. This pattern is very powerful and comes with other benefits, but most importantly, it allows us to keep components decoupled, while still being able to fetch data efficiently with the least amount of requests.\nI'll get back to Fragments later, but for now, let's look at the next problem.\nGraphQL servers need to implement relationships between types over returning IDs\nComing from REST APIs, we are used to returning IDs from GraphQL resolvers. E.g. the user resolver could return IDs for the posts of a user. However, this would not allow us to fetch a tree of data (user -> posts -> comments) with a single request. Instead, we would have to make a request for each post and then for each comment.\nTo solve this problem, GraphQL servers need to implement relationships between types. So, instead of returning IDs, resolvers should return relationships so that the GraphQL client can fetch deeply nested data with a single request.\nGraphQL clients and servers need to support persisted operations\nSending lots of GraphQL Operations over HTTP POST has two problems. First, it's inefficient, because we are sending the same query over and over again. Every client sends the same query, and the server has to parse the same query over and over again. That's not just costly in terms of performance, wasted bandwidth and CPU cycles, but also has security implications.\nOpening up a GraphQL endpoint to the public means that anyone can send any query to the server. The server needs to parse and validate requests before they can be executed. As we cannot trust the client, we need to harden the server against any kind of attack, which is more or less impossible as it's a cat and mouse game. You can protect against all known attacks, but eventually someone will find a new attack vector.\nIt's much better to use persisted operations over exposing a public GraphQL endpoint. With persisted operations, you're registering all known Operations on the server during build time. This doesn't just allow you to validate Operations ahead of time, but also optimize them, strip out unused or duplicate fields, and so on.\nEach Operation gets a unique ID, so in production, the client will just send this ID and the variables to the server. The server can then execute the Operation without having to parse and validate it. The only thing the server needs to do is to look up the Operation by ID, validate the variables and execute the Operation. That's a lot less work than parsing and validating the Operation.\nThe topic of this post was about overfetching and underfetching, so you might be wondering why I spend to much time talking about persisted operations. Performance and security concerns aside, persisted operations help us achieve two things.\nWe're sending a lot less data in the request, because we're not sending the content of the Operation. As we're working with larger companies, Operations can be as large as 17K",
+  "https://hackernoon.com/graphql-doesnt-solve-under-and-overfetching": "GraphQL Doesn't Solve Under & Overfetching\nCo-Founder & Head of Growth at WunderGraph.\nYour browser does not support the audio element.\nCo-Founder & Head of Growth at WunderGraph.\nCo-Founder & Head of Growth at WunderGraph.\nWhen you look at positive articles about GraphQL, you often hear how much better it is than REST and how it solves the problem of overfetching, underfetching and eliminates waterfalls, but is that really true?\nLet's explain the terms, look at the problems and evaluate if GraphQL does what we hear in all the praises of the Query language.\nYou'll learn that GraphQL does not solve the problems of overfetching, underfetching and waterfalls. It's not even close to solving these problems. Read on to understand why this is the case and how we can get the full benefits of GraphQL.\nOverfetching is the problem of fetching more data than you need. GraphQL advocates usually attribute this problem to REST APIs. REST APIs are often designed to be generic and reusable across different use cases, so it's not uncommon that a REST API returns more data than you actually need.\nIt's widely known that GraphQL has a native solution to this problem. Through the use of the Selection Set, you can specify exactly which fields you need. So, in theory, it's possible to solve the problem of overfetching with GraphQL. However, we'll see later that this often stays a theory and doesn't work in practice.\nFurthermore, the claim that REST APIs cannot solve this problem is also not true. You can use sparse fieldsets to achieve similar functionality in REST APIs.\nGET /api/dragons?fields=id,name,description\nThe problem with this approach is that it's not standardized and not widely used compared to Selection Sets in GraphQL.\nThe problem with this approach is that it's not standardized and not widely used compared to Selection Sets in GraphQL.\nIn addition to overfetching, GraphQL also claims to solve the problem of underfetching. Underfetching is the problem of not fetching enough data in a single request. This problem is often attributed to REST APIs as well.\nIn order to load all the data you need to present a page, you have to make a lot of requests, simply because a single request doesn't return all the data you need. This problem comes from the fact that REST APIs are usually too granular, which they have to be in order to be reusable.\nWhen listening to GraphQL advocates, it seems like GraphQL solves this problem as well. You can simply specify all the data you need in a single Query and the GraphQL server will return all the required data in a single response. Again, this works in theory, but does it work in practice?\nWhat is the problem with waterfall requests?\nIf we look at the problem of underfetching, what actually is the consequence of this problem? How does it manifest itself in a real-world application?\nFrom the user's perspective, it's quite undesirable to have to wait a long time until the page is loaded. This is even worse when the page loads incrementally over a period of 10-15 seconds.\nImagine a website with a lot of nested components, each building on top of each other. In order to render the page, you have to fetch data for each component. This means that you have to wait for the data of the first component to be fetched before you can fetch the data for the second component. This results in a long \"waterfall\" of requests because we can only render a child component when the data for the parent component is available, which in turn can only be fetched when the data for the grandparent component is available and that component can be rendered.\nThe waterfall usually looks something like this:\nThis is a very simplified example, but it illustrates the problem quite well.\nLuckily, with GraphQL we don't have the problems of waterfall requests, right? Let's look at a few examples.\nReal-world examples of GraphQL Underfetching, Overfetching & Waterfall requests\nTo better understand if the claims we hear about GraphQL are true, let's look at a few real-world examples.\nIf you want to follow along, follow the URLs, open the browser's network tab and have a look at the traffic.\nExample 1: Reddit - 42 GraphQL requests to load a subreddit\nReddit is the first example we'll look at. Let's take a look at the GraphQL Subreddit . We can count 42 requests, including preflight requests, so let's just count 21 actual requests.\nReddit uses persisted operations and sends the operation ID in the POST request body. The waterfall is huge.\nExample 2: Twitter - 6 GraphQL requests to load the home page\nTwitter is quite advanced, actually. If we look at the home page , we can see a few things.\nThe website makes 6 requests and uses persisted operations. Read requests leverage GET and the operation ID and variables are sent in the query string. Quite good, but still a waterfall of 6 requests.\nExample 3: twitch.tv - 16 GraphQL requests to load the home page\nLooking at twitch, we can see that their home page makes 16 requests. Twitch uses persisted operations and batching, so the 16 requests actually translate to a total of 32 requests.\nExample 4: Glassdoor - 3 GraphQL requests to load the member home page\nNext up, we have the Glassdoor member home page . In the network tab, we can see 3 HTTP POST requests, which are GraphQL requests without persisted operations, but they are using batching, so the 3 requests translate to a total of 7 GraphQL Operations.\nExample 5: Nerdwallet - 16 GraphQL requests to load the page for best credit cards\nAnother example, Nerdwallet best credit cards , makes 16 requests to an endpoint they call \"supergraph\", which might indicate what architecture they use. No persisted operations, no batching, all HTTP POST over HTTP/3.\nExample 6: Peleton - 3 GraphQL requests to load the bike page\nPeleton's bike page makes 3 requests. They send regular GraphQL requests over HTTP POST without persisted operations or batching. I noticed that they have 2 different GraphQL endpoints.\nExample 7: Priceline - 8 GraphQL requests to load a search page\nThe Search Page of Priceline makes 8 requests. They don't use persisted operations and send GraphQL requests over HTTP POST without batching.\nExample 8: Facebook - 10 GraphQL requests to load the home page\nFacebook's home page makes 10 requests. I would have expected less, but have a look yourself. They are sending persisted operations over HTTP POST.\nSummary of my findings in real-world GraphQL applications\nTo summarize my findings, I was unable to find a single website that eliminates the problem of underfetching and waterfall requests. Given the amount of GraphQL requests I've seen, it's also quite likely that a lot of the pages suffer from overfetching as well, I'll explain this in more detail later.\nGraphQL does not solve the problem of overfetching, underfetching and waterfall requests\nAnother observation is that most companies use a different style of GraphQL. Some use persisted operations, some use batching, some use both, some use neither. I found different ways of structuring URLs, some use query strings, some use the request body with HTTP POST. There is no real standard, and you might be wondering why.\nWhy does GraphQL fail to solve underfetching and overfetching in practice?\nWhat's often forgotten is that GraphQL is just a Query language. It doesn't specify how the data is fetched. The GraphQL specification doesn't say much about the transport layer, it's really just a specification for the Query language itself.\nSo, in theory GraphQL has the capability to solve the problem of underfetching and overfetching, but it takes more than just the Query language to solve these problems. We need a client-server architecture combined with a workflow that encourages us to reduce the number of requests per page.\nLet's break down the problem into smaller pieces.\nGraphQL clients need to encourage the use of Fragments\nWhen using GraphQL, there are two ways to specify the data you need. You can either specify the data with a Query at the top of the component tree, or you can use Fragments to specify the data at the component level.\nClients like Relay encourage the use of Fragments, allowing deeply nested components to specify what data they need. These fragments are then hoisted to the top of the component tree and combined into a single query. This pattern is very powerful and comes with other benefits, but most importantly, it allows us to keep components decoupled, while still being able to fetch data efficiently with the least amount of requests\nI'll get back to Fragments later, but for now, let's look at the next problem.\nGraphQL servers need to implement relationships between types over returning IDs\nComing from REST APIs, we are used to returning IDs from GraphQL resolvers. E.g. the user resolver could return IDs for the posts of a user. However, this would not allow us to fetch a tree of data (user -> posts -> comments) with a single request. Instead, we would have to make a request for each post and then for each comment.\nTo solve this problem, GraphQL servers need to implement relationships between types. So, instead of returning IDs, resolvers should return relationships so that the GraphQL client can fetch deeply nested data with a single request.\nGraphQL clients and servers need to support persisted operations\nSending lots of GraphQL Operations over HTTP POST has two problems. First, it's inefficient, because we are sending the same query over and over again. Every client sends the same query, and the server has to parse the same query over and over again. That's not just costly in terms of performance, wasted bandwidth and CPU cycles, but also has security implications.\nOpening up a GraphQL endpoint to the public means that anyone can send any query to the server. The server needs to parse and validate requests before they can be executed. As we cannot trust the client, we need to harden the server against any kind of attack, which is more or less impossible as it's a cat and mouse game. You can protect against all known attacks, but eventually someone will find a new attack vector.\nIt's much better to use persisted operations over exposing a public GraphQL endpoint. With persisted operations, you're registering all known Operations on the server during build time. This doesn't just allow you to validate Operations ahead of time, but also optimize them, strip out unused or duplicate fields, and so on.\nEach Operation gets a unique ID, so in production, the client will just send this ID and the variables to the server. The server can then execute the Operation without having to parse and validate it. The only thing the server needs to do is to look up the Operation by ID, validate the variables and execute the Operation. That's a lot less work than parsing and validating the Operation.\nThe topic of this post was about overfetching and underfetching, so you might be wondering why I spend to much time talking about persisted operations. Performance and security concerns aside, persisted operations help us achieve two things.\nWe're sending a lot less data in the request, because we're not sending the content of the Operation. As we're working with larger companies, Operations can be as large as 17KB. Imagine if every client has to send 17kb of data for every request.\nSecond, persisted operations allow us to \"optimize\" the Operation at build time. Let's get to that final point.\nHow Relay & WunderGraph solve the problem of underfetching, overfetching and waterfall requests\nI want to emphasize that there's no silver bullet, and there's definitely a learning curve when using Relay & WunderGraph for the first time, but the benefits are huge.\nCombining Relay with WunderGraph allows us not just to solve the problem of inefficient data fetching, but we're also making our applications a lot more secure, faster, and easier to maintain. Let's have a look at how the two open source projects can work together.\nLet's take a look at some (simplified) example co"
  },
  "expected": {
   "status": "completed",
@@ -379,14 +463,14 @@
   "replans": 0,
   "recoveries": 0,
   "subtasks": [
-   "analyze_comparison:done",
-   "critique_analysis:done",
+   "analyze:done",
+   "critique:done",
    "research_graphql:done",
    "research_rest:done",
-   "write_brief:done"
+   "write:done"
   ],
-  "evidence": 7,
-  "brief_sha256": "5ba467a367bb3004",
+  "evidence": 8,
+  "brief_sha256": "8cc2639c6a033d15",
   "cited": [
    1,
    2,
@@ -394,7 +478,8 @@
    4,
    5,
    6,
-   7
+   7,
+   8
   ],
   "validated": true
  }

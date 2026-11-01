@@ -46,6 +46,9 @@ Rules:
 - Prefer 2+ INDEPENDENT researcher subtasks (so they can run in parallel), then one analyst that
   depends on them, then a critic that depends on the analyst, then a writer that depends on the critic.
 - Do not create cycles. Every `depends_on` id must be a real subtask id.
+- For each researcher subtask, give 1-3 web search `queries`: short (3-8 words), each aimed at
+  specific, authoritative sources (data, official docs, studies) and covering a different angle.
+  Leave `queries` empty for other roles.
 Return ONLY the structured plan."""
 
 
@@ -57,6 +60,7 @@ class PlanSubtask(BaseModel):
     description: str
     role: Role
     depends_on: list[str] = Field(default_factory=list)
+    queries: list[str] = Field(default_factory=list)  # researcher subtasks only
 
 
 class Plan(BaseModel):
@@ -120,8 +124,19 @@ def validate_and_build(plan: Plan, max_subtasks: int) -> list[Subtask]:
     if _has_cycle(graph):
         raise PlanValidationError("plan dependency graph contains a cycle")
 
+    def queries(s: PlanSubtask) -> list[str]:
+        if s.role != Role.researcher:
+            return []
+        out: list[str] = []
+        for q in s.queries:
+            q = " ".join(q.split())
+            if q and q.lower() not in {o.lower() for o in out}:
+                out.append(q)
+        return out[:3]
+
     return [
-        Subtask(id=s.id, description=s.description, role=s.role, depends_on=list(s.depends_on))
+        Subtask(id=s.id, description=s.description, role=s.role, depends_on=list(s.depends_on),
+                queries=queries(s))
         for s in subs
     ]
 

@@ -20,6 +20,7 @@ one costs more here than anywhere else.
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from pydantic import BaseModel
@@ -40,6 +41,8 @@ Your job:
   loses it for good.
 - Prefer concrete specifics (numbers, named mechanisms, stated limitations) over
   general statements, and keep distinct points as separate findings.
+- Some results include passages read from the page itself ("from the page"); they are
+  fuller than search snippets, so draw specifics from them first.
 - Keep the qualifiers a source uses ("up to", "in Germany", "a 2023 study") and the
   year of any figure when the source gives it.
 - If a result is a vendor or advocacy source making a claim in its own favour, say so
@@ -63,7 +66,7 @@ def _render_results(data: list[dict]) -> str:
     for i, r in enumerate(data, start=1):
         source = r.get("url") or r.get("source") or f"result_{i}"
         title = r.get("title", "")
-        text = r.get("snippet") or r.get("content") or ""
+        text = f"(from the page)\n{r['page']}" if r.get("page") else (r.get("snippet") or r.get("content") or "")
         lines.append(f"[{i}] source={source} {title}\n{text}".strip())
     return "\n\n".join(lines)
 
@@ -132,26 +135,29 @@ class Researcher(Subagent):
 
         if corpus is not None:  # offline / deterministic path
             result = registry.run("retrieve", query=query, corpus=corpus)
+            if not result.ok:
+                return self._fail(subtask, result.error or "tool failed"), []
+            data = result.data
         else:
-            result = registry.run("web_search", query=query, on_retry=on_retry)
-
-        if not result.ok:
-            return self._fail(subtask, result.error or "tool failed"), []
-        if not result.data:
+            data, error = self._search(subtask, registry, on_retry)
+            if error:
+                return self._fail(subtask, error), []
+        if not data:
             return self._fail(subtask, "no results for sub-question"), []
 
         findings = self._structured(
             ResearchFindings,
-            f"Sub-question: {query}\n\nRaw results:\n{_render_results(result.data)}",
+            f"Sub-question: {query}\n\nRaw results:\n{_render_results(data)}",
             on_retry=on_retry,
         )
-        grounded = _ground(findings.findings, result.data)
+        result_data = data
+        grounded = _ground(findings.findings, result_data)
         if len(grounded) < len(findings.findings):
             kept = {(g.content) for g in grounded}
             odd = sorted({f.source for f in findings.findings if f.content.strip() not in kept})
             self.log.info("researcher %s dropped %d ungrounded or duplicate findings (sources: %s; shown: %s)",
                           subtask.id, len(findings.findings) - len(grounded), odd[:4],
-                          [r.get("url") or r.get("source") for r in result.data][:5])
+                          [r.get("url") or r.get("source") for r in result_data][:5])
         evidence = [Evidence(subtask_id=subtask.id, source=f.source, content=f.content) for f in grounded]
         if not evidence:
             return self._fail(subtask, "no grounded findings extracted from results"), []
@@ -165,6 +171,49 @@ class Researcher(Subagent):
         )
         self.log.info("researcher %s -> %d evidence items", subtask.id, len(evidence))
         return done, evidence
+
+    def _search(self, subtask: Subtask, registry: ToolRegistry, on_retry: Optional[OnRetry]):
+        """Run the planned queries (or the description), merge distinct results, and read
+        the top pages. Returns (results, error); an error only if every search failed."""
+        cfg = self.settings
+        queries = (subtask.queries or [subtask.description])[: max(1, cfg.search_queries)]
+        merged: list[dict] = []
+        seen: set[str] = set()
+        errors: list[str] = []
+        for q in queries:
+            r = registry.run("web_search", query=q, on_retry=on_retry)
+            if not r.ok:
+                errors.append(r.error or "search failed")
+                continue
+            for item in r.data or []:
+                k = _key(item.get("url") or "")
+                if k and k not in seen:
+                    seen.add(k)
+                    merged.append(dict(item))
+        if not merged and errors:
+            return None, errors[0]
+        merged = merged[: cfg.search_results_kept]
+        self._read_pages(merged, " ".join([subtask.description, *queries]))
+        return merged, None
+
+    def _read_pages(self, results: list[dict], question: str) -> None:
+        """Attach the most relevant passages of the top pages, read in parallel. A page
+        that can't be read keeps its snippet."""
+        from ..tools import fetch_page  # looked up at call time: recordings replace fetch_text
+
+        top = [r for r in results if r.get("url")][: self.settings.fetch_pages]
+        if not top:
+            return
+        timeout = self.settings.fetch_timeout_seconds
+        with ThreadPoolExecutor(max_workers=len(top)) as pool:
+            texts = list(pool.map(lambda r: fetch_page.fetch_text(r["url"], timeout), top))
+        read = 0
+        for r, text in zip(top, texts):
+            excerpt = fetch_page.passages(text, question, self.settings.page_chars) if text else ""
+            if excerpt:
+                r["page"] = excerpt
+                read += 1
+        self.log.info("researcher read %d of %d pages", read, len(top))
 
     def _fail(self, subtask: Subtask, error: str) -> Subtask:
         self.log.warning("researcher %s failed: %s", subtask.id, error)

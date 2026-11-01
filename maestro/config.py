@@ -63,7 +63,15 @@ class Settings(BaseSettings):
     # --- Search tool ---
     search_provider: str = "duckduckgo"  # keyless default
     search_api_key: str = Field(default="", alias="SEARCH_API_KEY")
-    search_max_results: int = 5
+    search_max_results: int = 5      # per query
+    # A researcher runs up to `search_queries` of its planned queries, keeps the first
+    # `search_results_kept` distinct results, and reads the top `fetch_pages` pages
+    # (falling back to the search snippet when a page can't be read).
+    search_queries: int = 2
+    search_results_kept: int = 8
+    fetch_pages: int = 3
+    page_chars: int = 2500           # relevant passages kept per page
+    fetch_timeout_seconds: float = 6.0
 
     # --- Concurrency & plan bounds ---
     max_parallel: int = 2  # Gemini free tier ~10 RPM -> keep small

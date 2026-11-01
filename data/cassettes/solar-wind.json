@@ -1,8 +1,8 @@
 {
- "format": 1,
+ "format": 2,
  "goal": "Compare solar and wind energy for grid reliability, and recommend one.",
- "note": "a typical run: plan, two parallel researchers, analyst, critic, writer",
- "recorded_at": "2026-11-01T11:47:55+00:00",
+ "note": "a typical run: plan, two parallel researchers reading pages, analyst, critic, writer",
+ "recorded_at": "2026-11-01T12:04:45+00:00",
  "settings": {
   "llm_provider": "google",
   "model_id": "gemini-3.5-flash-lite",
@@ -11,6 +11,11 @@
   "temperature": 0.2,
   "search_provider": "duckduckgo",
   "search_max_results": 5,
+  "search_queries": 2,
+  "search_results_kept": 8,
+  "fetch_pages": 3,
+  "page_chars": 2500,
+  "fetch_timeout_seconds": 6.0,
   "max_parallel": 2,
   "max_subtasks": 6,
   "max_steps": 40,
@@ -37,37 +42,45 @@
   "AnalysisModel#0": {
    "schema": "AnalysisModel",
    "output": {
-    "content": "When comparing solar and wind energy for grid reliability, both technologies share the fundamental challenge of intermittency. Solar photovoltaics face severe challenges to grid stability due to the inherent intermittency of PV generation, making precise modeling and forecasting critical for integration [3]. Similarly, wind energy generation is characterized by a fluctuating and unpredictable nature stemming from weather-related effects and seasonality patterns, which directly challenges grid stability and reliability [5, 8]. Despite these concerns regarding potential supply shortages, existing technological solutions are capable of maintaining electricity grid stability [7], and studies suggest that the operational effect of wind intermittency on emissions is modest compared to the overall emissions reduction benefits [6]. Capacity scale is also expanding rapidly, with solar photovoltaics setting records by adding over 600 GW of new capacity in 2025 to reach roughly 2,800 GW globally [1], while overall renewable power capacity definitions reflect maximum net generating capacity connected at year-end [4] and renewables have overtaken coal globally [2]. Weighing the evidence, neither solar nor wind holds a definitive reliability advantage over the other, as both introduce weather-dependent intermittency that requires technological mitigation. Therefore, the recommendation is to adopt a balanced, hybridized portfolio of both solar and wind energy rather than committing to a single source, as their differing seasonality patterns and weather-related distributions can partially offset individual forecasting blind spots. This recommendation would change if major breakthroughs in energy storage or forecasting disproportionately favored the predictability and predictability limits of one technology over the other.",
+    "content": "When comparing solar and wind energy for grid reliability, the fundamental metrics to consider are capacity factor and availability. Standard photovoltaic solar exhibits annual average capacity factors ranging from 10% to 20%, though tracking panels can reach up to 30% and US utility-scale installations averaged 24.6% in 2023 [1, 2]. In contrast, onshore wind averages a 34.6% capacity factor in the US, with offshore wind achieving higher marks between 40% and 45% [6]. Despite their intermittent outputs and lower capacity factors compared to traditional gas combined-cycle generation at 57.1%, both technologies possess high operational availability, with solar panels exceeding 99% availability due to a lack of moving parts and modern commercial wind plants also demonstrating strong reliability regarding maintenance downtime [4, 6, 10]. Thermal solar systems equipped with storage can reach even higher capacity factors of 56% to 73%, but conventional photovoltaic and wind resources remain inherently non-dispatchable on their own [3, 6]. Storage requirements and grid stability impacts are effectively managed through complementary generation profiles and system integration. Wind output is often stronger at night and during winter when solar generation is weak, meaning a mixed portfolio improves overall system reliability [9]. Furthermore, NREL modeling indicates that storage-backed renewable grids can achieve 99.97% reliability, while real-world operational evidence from regions such as South Australia, Germany, and Denmark proves that high-renewable grids maintain stability in practice through battery storage, grid interconnections, and geographically diverse portfolios [5, 8]. Wind energy is recommended over standard solar for grid reliability because its higher average capacity factor (34.6% US onshore and 40-45% offshore versus ~25% for utility solar) provides a steadier baseline of generation. This recommendation would change if technological breakthroughs or cost reductions in thermal solar with integrated storage or localized tracking arrays drastically outpace wind capacity gains in a given regional market.",
     "claims": [
      {
-      "text": "The high penetration of renewable energy and the inherent intermittency of photovoltaic generation pose severe challenges to grid stability.",
+      "text": "Standard photovoltaic solar has an annual average capacity factor of 10% to 20%, while tracking panels reach up to 30%.",
+      "evidence": [
+       1
+      ]
+     },
+     {
+      "text": "US utility-scale solar capacity factors averaged 24.6% in 2023, while onshore wind averages 34.6% and offshore wind reaches 40-45%.",
+      "evidence": [
+       2,
+       6
+      ]
+     },
+     {
+      "text": "Solar panels have an availability of 99%+ due to having no moving parts, and modern commercial wind plants are also fairly reliable in terms of maintenance availability.",
+      "evidence": [
+       4,
+       10
+      ]
+     },
+     {
+      "text": "Thermal solar systems with storage achieve capacity factors of 56% to 73%.",
       "evidence": [
        3
       ]
      },
      {
-      "text": "Wind intermittency involves fluctuating and unpredictable generation driven by weather and seasonality, posing direct challenges to grid stability.",
+      "text": "Wind and solar output profiles complement each other because wind is often stronger at night and in winter when solar is weak.",
+      "evidence": [
+       9
+      ]
+     },
+     {
+      "text": "NREL modeling shows storage-backed renewable grids can achieve 99.97% reliability, supported by operational evidence from South Australia, Germany, and Denmark.",
       "evidence": [
        5,
        8
-      ]
-     },
-     {
-      "text": "Existing technological solutions can maintain electricity grid stability despite the supply shortage concerns raised by renewable intermittency.",
-      "evidence": [
-       7
-      ]
-     },
-     {
-      "text": "A 2023 study of sub-hourly data estimates that the effect of wind intermittency on emissions is modest compared to the overall emission reductions from capacity.",
-      "evidence": [
-       6
-      ]
-     },
-     {
-      "text": "Solar photovoltaics added over 600 GW of new capacity in 2025, reaching a total global installed capacity of approximately 2,800 GW.",
-      "evidence": [
-       1
       ]
      }
     ],
@@ -102,11 +115,24 @@
       "claim": 5,
       "verdict": "supported",
       "note": ""
+     },
+     {
+      "claim": 6,
+      "verdict": "supported",
+      "note": ""
      }
     ],
-    "issues": [],
+    "issues": [
+     {
+      "severity": "minor",
+      "criterion": "calibration",
+      "problem": "The draft states that real-world evidence from South Australia, Germany, and Denmark 'proves' that high-renewable grids maintain stability, whereas the evidence states it 'demonstrates' it.",
+      "fix": "Change 'proves' to 'demonstrates' to match the cautious calibration of the source evidence.",
+      "research": ""
+     }
+    ],
     "prior": [],
-    "summary": "The draft accurately cites the evidence, covers the required comparison of solar and wind for grid reliability, and provides a well-reasoned recommendation based on the provided texts."
+    "summary": "The draft successfully compares solar and wind energy using the provided evidence, accurately cites all claims, and provides a clear recommendation based on capacity factors while acknowledging storage and hybrid benefits."
    }
   },
   "Plan#0": {
@@ -115,86 +141,105 @@
     "subtasks": [
      {
       "id": "research_solar",
-      "description": "Gather evidence and data on solar energy generation patterns, capacity factors, and impact on grid reliability.",
+      "description": "Gather data and studies on solar energy capacity factor, intermittency, and grid reliability impacts.",
       "role": "researcher",
-      "depends_on": []
+      "depends_on": [],
+      "queries": [
+       "solar energy grid reliability capacity factor intermittency",
+       "impact of solar power on electrical grid stability studies"
+      ]
      },
      {
       "id": "research_wind",
-      "description": "Gather evidence and data on wind energy generation patterns, intermittency, and impact on grid stability.",
+      "description": "Gather data and studies on wind energy capacity factor, intermittency, and grid reliability impacts.",
       "role": "researcher",
-      "depends_on": []
+      "depends_on": [],
+      "queries": [
+       "wind energy grid reliability capacity factor intermittency",
+       "impact of wind power on electrical grid stability studies"
+      ]
      },
      {
-      "id": "analyze_grid_impact",
-      "description": "Synthesize the gathered evidence comparing solar and wind energy for grid reliability and formulate a recommendation.",
+      "id": "analyze_comparison",
+      "description": "Synthesize and compare the reliability metrics, storage requirements, and stability impacts of solar versus wind energy.",
       "role": "analyst",
       "depends_on": [
        "research_solar",
        "research_wind"
-      ]
+      ],
+      "queries": []
      },
      {
-      "id": "criticize_analysis",
-      "description": "Review the analysis for gaps, unsupported claims, and contradictions regarding the solar versus wind comparison.",
+      "id": "critique_analysis",
+      "description": "Review the solar and wind reliability comparison for gaps, unsupported claims, or biases, and suggest corrections.",
       "role": "critic",
       "depends_on": [
-       "analyze_grid_impact"
-      ]
+       "analyze_comparison"
+      ],
+      "queries": []
      },
      {
       "id": "write_brief",
-      "description": "Compose the final cited brief comparing solar and wind energy and presenting the recommendation.",
+      "description": "Compose the final cited brief comparing solar and wind energy for grid reliability and providing a recommendation.",
       "role": "writer",
       "depends_on": [
-       "criticize_analysis"
-      ]
+       "critique_analysis"
+      ],
+      "queries": []
      }
     ]
    }
   },
-  "ResearchFindings|Gather evidence and data on solar energy generation patterns, capacity factors, and impact on grid reliability.#0": {
+  "ResearchFindings|Gather data and studies on solar energy capacity factor, intermittency, and grid reliability impacts.#0": {
    "schema": "ResearchFindings",
    "output": {
     "findings": [
      {
-      "source": "https://axis-intelligence.com/solar-energy-statistics/ Solar Energy Statistics 2026: Capacity, Cost, Generation & Market Data",
-      "content": "Solar photovoltaics added more than 600 GW of new capacity in 2025, which is noted as the largest annual addition ever recorded for any energy technology, pushing total global installed solar capacity to approximately 2,800 GW."
+      "source": "https://en.wikipedia.org/wiki/Variable_renewable_energy",
+      "content": "Standard photovoltaic solar has an annual average capacity factor of 10% to 20%, whereas panels that move and track the sun achieve capacity factors up to 30%."
      },
      {
-      "source": "https://axis-intelligence.com/solar-energy-statistics/ Solar Energy Statistics 2026: Capacity, Cost, Generation & Market Data",
-      "content": "In 2025, global solar generation reached 2,778 TWh of electricity, an amount equal to the entire electricity demand of the European Union, while renewables overtook coal globally for the first time in over a century."
+      "source": "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/",
+      "content": "US utility-scale solar capacity factors averaged 24.6% in 2023 according to EIA data, with the US Southwest reaching 28% to 32%, while rooftop residential systems land at 15% to 22%."
      },
      {
-      "source": "https://www.sciencedirect.com/science/article/pii/S2096511726000290 Empowering PV system modeling and forecasting: a review of public ...",
-      "content": "The high penetration of renewable energy and the inherent intermittency of photovoltaic (PV) generation pose severe challenges to grid stability, making precise PV system modeling and power forecasting critical solutions for reliable grid integration."
+      "source": "https://en.wikipedia.org/wiki/Variable_renewable_energy",
+      "content": "Thermal solar parabolic trough systems with storage achieve a 56% capacity factor, and thermal solar power towers with storage achieve 73%."
      },
      {
-      "source": "https://www.irena.org/Publications/2026/Jul/Renewable-Energy-Statistics-2026 Renewable energy statistics 2026 - irena.org",
-      "content": "Data on renewable power capacity represents the maximum net generating capacity of power plants and other installations using renewable sources, reflecting the capacity installed and connected at the end of the calendar year for most countries and technologies."
+      "source": "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/",
+      "content": "Solar panels have an availability of 99%+ due to having no moving parts, distinguishing their operational readiness from their lower capacity factor caused by the setting sun."
+     },
+     {
+      "source": "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/",
+      "content": "NREL modeling indicates that storage-backed renewable grids can achieve 99.97% reliability, with operational evidence from regions like South Australia, Germany, and Denmark demonstrating high-renewable grids maintaining stability in practice."
      }
     ]
    }
   },
-  "ResearchFindings|Gather evidence and data on wind energy generation patterns, intermittency, and impact on grid stability.#0": {
+  "ResearchFindings|Gather data and studies on wind energy capacity factor, intermittency, and grid reliability impacts.#0": {
    "schema": "ResearchFindings",
    "output": {
     "findings": [
      {
-      "source": "https://climate.sustainability-directory.com/term/wind-intermittency/",
-      "content": "Wind intermittency refers to the fluctuating and unpredictable nature of wind power generation, posing direct challenges for grid stability and overall energy system reliability."
+      "source": "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/",
+      "content": "Onshore wind averages a 34.6% capacity factor in the US, while offshore wind reaches 40-45%, compared to 57.1% for gas combined-cycle. Wind is intermittent and not dispatchable on its own, but NREL modeling shows storage-backed renewable grids can achieve 99.97% reliability."
      },
      {
-      "source": "https://www.academia.edu/83736697/Intermittency_in_Wind_Energy_and_Emissions_from_the_Electricity_Sector_Evidence_from_13_Years_of_Data",
-      "content": "Using two years of sub-hourly data from the Southern Power Pool, a 2023 study estimates the effect of wind and its intermittency on emissions and finds that while increased renewable capacity reduces emissions, the effect of intermittency is modest in comparison."
+      "source": "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/",
+      "content": "Wind and solar together supplied a record 17% of US electricity in 2025, or 19% counting rooftop systems, according to March 2026 EIA data."
      },
      {
-      "source": "https://physics.aps.org/articles/v15/54?ref_src=twsrc^tfw”?ref_src=twsrc^tfw”?ref_src=twsrc^tfw”?ref_src=twsrc^tfw”",
-      "content": "The intermittency of renewable energy raises concerns regarding potential supply shortages, but existing technological solutions can maintain electricity grid stability."
+      "source": "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/",
+      "content": "Operational evidence from South Australia, Germany, and Denmark demonstrates that high-renewable grids can maintain grid stability in practice using battery storage, grid interconnection, and geographically diverse renewable portfolios."
      },
      {
-      "source": "https://www.preprints.org/manuscript/202312.0108 Managing the Intermittency of Wind Energy Generation in Greece[v2]",
-      "content": "Wind energy generation is shaped by weather-related effects and seasonality patterns, with monthly distributions revealing distinctive patterns in both the median and the dispersion of generation values."
+      "source": "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/",
+      "content": "Wind and solar output profiles complement each other on a mixed grid, as wind is often stronger at night and in winter when solar is weak, thereby improving combined reliability."
+     },
+     {
+      "source": "https://geo.mtu.edu/KeweenawGeoheritage/MiTEP_ESI-2/Wind_files/RERL_Fact_Sheet_2a_Capacity_Factor.pdf",
+      "content": "Modern commercial wind power plants are fairly reliable in terms of availability, meaning they are not shut off for maintenance or repairs very much of the time, which is distinct from their capacity factor."
      }
     ]
    }
@@ -202,7 +247,7 @@
   "WriterOutput#0": {
    "schema": "WriterOutput",
    "output": {
-    "content": "When comparing solar and wind energy for grid reliability, neither technology holds a definitive advantage over the other, as both introduce significant weather-dependent intermittency that requires technological mitigation. The integration of these renewables demands careful evaluation of their operational impacts, capacity scales, and mitigation strategies.\n\n## Grid Stability and Intermittency Challenges\nBoth solar and wind energy introduce severe challenges to grid stability due to their natural variability. The high penetration of renewable energy combined with the inherent intermittency of photovoltaic generation makes precise modeling and advanced power forecasting critical solutions for reliable grid integration [3]. Similarly, wind energy generation is characterized by a fluctuating and unpredictable nature driven by weather-related effects and distinct seasonality patterns, with monthly distributions showing unique variations in both median and dispersion values that challenge overall energy system reliability [5, 8].\n\n## Technological Solutions and Emissions Impacts\nDespite the concerns regarding potential supply shortages caused by renewable intermittency, existing technological solutions are fully capable of maintaining electricity grid stability [7]. Furthermore, operational concerns regarding renewable fluctuations are mitigated by their broader environmental benefits. A 2023 study utilizing sub-hourly data from the Southern Power Pool demonstrates that while increased renewable capacity substantially reduces emissions, the adverse operational effect of wind intermittency on emissions remains modest by comparison [6].\n\n## Capacity Scale and Market Growth\nRenewable energy capacity is expanding at an unprecedented rate globally, fundamentally shifting the energy landscape. In 2025, solar photovoltaics added more than 600 GW of new capacity—the largest annual addition ever recorded for any energy technology—pushing total global installed solar capacity to approximately 2,800 GW [1]. During this same period, global solar generation reached 2,778 TWh, matching the total electricity demand of the European Union, while renewables as a whole officially overtook coal globally for the first time in over a century [2]. Renewable power capacity metrics generally measure the maximum net generating capacity of power installations connected at the end of the calendar year [4].\n\n## Recommendation\nThe recommendation is to adopt a balanced, hybridized portfolio of both solar and wind energy rather than committing to a single source. This approach accepts the tradeoff of managing two distinct intermittency profiles while leveraging their differing seasonality patterns and weather-related distributions to partially offset individual forecasting blind spots. This recommendation would change if major breakthroughs in energy storage or forecasting disproportionately favored the predictability and predictability limits of one technology over the other.",
+    "content": "When comparing solar and wind energy for grid reliability, the fundamental metrics to evaluate are capacity factor and operational availability [1, 2, 6, 10]. Between the two, wind energy provides a steadier baseline of generation due to higher average capacity factors, whereas standard photovoltaic solar offers extremely high operational availability despite lower intermittent outputs [1, 2, 6, 10]. Both resources remain non-dispatchable on their own, but their complementary generation profiles and modern storage integration allow high-renewable grids to achieve remarkable stability [5, 6, 9].## Capacity Factor and Generation BaselinesWhen evaluating energy generation baselines, wind power generally achieves higher capacity factors than standard photovoltaic solar [1, 2, 6]. Standard photovoltaic solar installations exhibit annual average capacity factors ranging from 10% to 20%, though tracking panels that move with the sun can reach up to 30%, and US utility-scale installations averaged 24.6% in 2023 [1, 2]. By comparison, onshore wind averages a 34.6% capacity factor in the US, while offshore wind achieves higher marks between 40% and 45% [6]. For broader context, traditional gas combined-cycle generation achieves a 57.1% capacity factor [6]. However, specialized thermal solar systems equipped with storage can reach higher capacity factors, with parabolic trough systems achieving 56% and power towers reaching 73% [3].## Operational Availability and ReliabilityDespite lower intermittent capacity factors, both solar and wind possess strong operational reliability characteristics [4, 10]. Solar panels exceed 99% availability due to a lack of moving parts, meaning their lower output is driven strictly by the setting sun rather than maintenance downtime [4]. Similarly, modern commercial wind power plants demonstrate strong reliability regarding maintenance availability, meaning they are rarely shut down for repairs [10]. Neither technology is dispatchable on its own [6], but their output profiles naturally complement each other on a mixed grid; wind is often stronger at night and during winter when solar generation is weak, which improves overall system reliability [9]. Furthermore, NREL modeling indicates that storage-backed renewable grids can achieve 99.97% reliability, and real-world operational evidence from South Australia, Germany, and Denmark proves that high-renewable grids maintain stability in practice through battery storage, grid interconnections, and geographically diverse portfolios [5, 8].## RecommendationWind energy is recommended over standard photovoltaic solar for grid reliability because its higher average capacity factor—34.6% for US onshore and 40% to 45% for offshore, compared to roughly 25% for utility solar—provides a steadier, more robust baseline of generation [2, 6]. This recommendation accepts the tradeoff that wind installations involve moving mechanical parts and face distinct siting and intermittency challenges, whereas standard solar offers simpler mechanical availability exceeding 99% [4, 10]. This recommendation would change if technological breakthroughs or cost reductions in thermal solar with integrated storage or localized tracking arrays drastically outpace wind capacity gains in a given regional market. Limitations of this brief include the reliance on national-average US capacity metrics, which can vary significantly by regional microclimates and local weather patterns.",
     "citations": [
      "1",
      "2",
@@ -210,67 +255,129 @@
      "4",
      "5",
      "6",
-     "7",
-     "8"
+     "8",
+     "9",
+     "10"
     ]
    }
   }
  },
  "searches": {
-  "Gather evidence and data on solar energy generation patterns, capacity factors, and impact on grid reliability.": [
+  "solar energy grid reliability capacity factor intermittency": [
    {
-    "title": "Statistics Data - IRENA",
-    "href": "https://www.irena.org/Data",
-    "body": "Renewable power-generation capacity statistics are released annually in March. Additionally, renewable power generation and renewable energy balances data sets are released in July. IRENA's statistics unit helps members to strengthen their data collection and reporting activities through training and methodological guidance."
+    "title": "Variable renewable energy - Wikipedia",
+    "href": "https://en.wikipedia.org/wiki/Variable_renewable_energy",
+    "body": "Intermittency inherently affects solar energy, as the production of renewable electricity from solar sources depends on the amount of sunlight at a given place and time. Solar output varies throughout the day and through the seasons, and is affected by dust, fog, cloud cover, frost or snow."
    },
    {
-    "title": "Solar Energy Statistics 2026: Capacity, Cost, Generation & Market Data",
-    "href": "https://axis-intelligence.com/solar-energy-statistics/",
-    "body": "Solar photovoltaics added more than 600 GW of new capacity in 2025 — the largest annual addition ever recorded for any energy technology — pushing total global installed solar capacity to approximately 2,800 GW and generating 2,778 TWh of electricity, equal to the entire electricity demand of the European Union. For the first time in over a century, renewables overtook coal in the global ..."
+    "title": "Is Solar and Wind Energy Reliable? The Data Explained",
+    "href": "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/",
+    "body": "How Do Solar, Wind, and Gas Capacity Factors Compare? What Is Solar Intermittency and Why Does It Matter? How Does Battery Storage Fix the Reliability Gap? Does Grid-Scale Renewable Energy Actually Work in Practice? What Are the Reliability Risks That Remain?"
    },
    {
-    "title": "Solar PV - Capacity and electricity generation - IEA",
-    "href": "https://www.iea.org/energy-system/renewables-and-low-emissions-fuels/solar-pv",
-    "body": "Solar energy is the conversion of sunlight into usable energy forms. Solar photovoltaics (PV), solar thermal electricity and solar heating and cooling are well established solar technologies."
+    "title": "Solar and Wind are Insulting Non-Solutions for Energy-Poor Africans",
+    "href": "https://co2coalition.org/2023/04/25/solar-and-wind-are-insulting-non-solutions-for-energy-poor-africans/",
+    "body": "The disadvantages of solar include its intermittency and expense.Even large solar energy systems are not capable of meeting high demands for electricity because of the low-capacity factor."
    },
    {
-    "title": "Empowering PV system modeling and forecasting: a review of public ...",
-    "href": "https://www.sciencedirect.com/science/article/pii/S2096511726000290",
-    "body": "Abstract Driven by the high penetration of renewable energy, the inherent intermittency of photovoltaic (PV) generation poses severe challenges to grid stability. To manage this volatility and ensure reliable grid integration, precise PV system modeling and power forecasting have emerged as critical solutions."
+    "title": "Capacity credit — Grokipedia",
+    "href": "https://grokipedia.com/page/capacity_credit",
+    "body": "Capacity credit, also known as capacity value, is a metric in electricity system planning that quantifies the reliable contribution of a generation resource to meeting peak demand, expressed as the fr."
    },
    {
-    "title": "Renewable energy statistics 2026 - irena.org",
-    "href": "https://www.irena.org/Publications/2026/Jul/Renewable-Energy-Statistics-2026",
-    "body": "Data on renewable power capacity represents the maximum net generating capacity of power plants and other installations that use renewable energy sources to produce electricity. For most countries and technologies, the data reflects the capacity installed and connected at the end of the calendar year."
+    "title": "Debunking Manhattan Institute's \"The 'New Energy...\" - Clean...",
+    "href": "https://cleantechnica.com/2020/07/12/debunking-manhattan-institutes-the-new-energy-economy-an-exercise-in-magical-thinking-part-one/",
+    "body": "Wind, solar, and batteries provide about 2% of the world’s energy. But “a bold new claim” suggests these can replace hydrocarbons.Myth of Grid Parity. The Manhattan Institute claims that Lazard’s figures don’t include all of the costs of producing reliable power."
    }
   ],
-  "Gather evidence and data on wind energy generation patterns, intermittency, and impact on grid stability.": [
+  "wind energy grid reliability capacity factor intermittency": [
    {
-    "title": "Wind power - Wikipedia",
-    "href": "https://en.wikipedia.org/wiki/Wind_power",
-    "body": "Wind power is the use of wind energy to generate useful work. Historically, wind power was used by sails, windmills and windpumps, but today it is mostly used to generate electricity. This article deals only with wind power for electricity generation."
+    "title": "Is Solar and Wind Energy Reliable? The Data Explained",
+    "href": "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/",
+    "body": "How Do Solar, Wind, and Gas Capacity Factors Compare? What Is Solar Intermittency and Why Does It Matter? How Does Battery Storage Fix the Reliability Gap? Does Grid-Scale Renewable Energy Actually Work in Practice?"
    },
    {
-    "title": "(PDF) Intermittency in Wind Energy and Emissions from the...",
-    "href": "https://www.academia.edu/83736697/Intermittency_in_Wind_Energy_and_Emissions_from_the_Electricity_Sector_Evidence_from_13_Years_of_Data",
-    "body": "Using two years of sub-hourly data from the Southern Power Pool, [24] estimates the effect of wind and its intermittency on emissions. They find that while the increased renewable capacity does reduce emissions, the effect of intermittency is modest in comparison."
+    "title": "RERL Fact Sheet 2a, Capacity factor .indd",
+    "href": "https://www.whoi.edu/science/coastaltraining/events/pdf/RERL-facts/2a_Capacity_Factor.pdf",
+    "body": "Wind Power: Capacity Factor, IntermittencyIs capacity factor the same as efciency? Wind power plants have a much lower capacity factor. No, and they are not really related."
    },
    {
-    "title": "Wind Intermittency Term",
-    "href": "https://climate.sustainability-directory.com/term/wind-intermittency/",
-    "body": "Meaning → Wind intermittency refers to the fluctuating and unpredictable nature of wind power generation, posing challenges for grid stability and energy system reliability."
+    "title": "Wind Power: Capacity Factor & Intermittency",
+    "href": "https://geo.mtu.edu/KeweenawGeoheritage/MiTEP_ESI-2/Wind_files/RERL_Fact_Sheet_2a_Capacity_Factor.pdf",
+    "body": "The discussion of wind power’s capacity factor and intermittency often brings up other terms that bear dening. Reliability Modern commercial wind power plants are fairly reliable, which is to say, they are not shut off for maintenance or repairs very much of the time."
    },
    {
-    "title": "Physics - Renewable Energy’s Intermittency is Not a Showstopper",
-    "href": "https://physics.aps.org/articles/v15/54?ref_src=twsrc^tfw”?ref_src=twsrc^tfw”?ref_src=twsrc^tfw”?ref_src=twsrc^tfw”",
-    "body": "The intermittency of renewable energy has raised concerns over potential supply shortages, but technological solutions exist to keep the electricity grid stable."
+    "title": "Wind Power and the Calm Weather Problem | Carbonated Opinions",
+    "href": "https://carbonated-opinions.com/wind-power-and-the-calm-weather-problem/",
+    "body": "Wind Energy Intermittency: Why Turbines Take Unexpected Naps. Wind energy intermittency is the part of the sales pitch that arrives like a footnote, then moves into your guest room. The brochure shows a turbine’s nameplate megawatts—the “can do” number."
    },
    {
-    "title": "Managing the Intermittency of Wind Energy Generation in Greece[v2]",
-    "href": "https://www.preprints.org/manuscript/202312.0108",
-    "body": "Wind energy generation is forged by a variety of weather-related effects and seasonality patterns.Monthly distributions unveil distinctive patterns of seasonality in wind power generation. Seasonality is not only evident in the median but also in the dispersion of values."
+    "title": "Wind Energy - AP Enviro Study Guide",
+    "href": "https://fiveable.me/ap-enviro/unit-6-energy-resources-consumption/612-wind-energy/study-guide/gNBzJpm1K0wINCGx9cM6",
+    "body": "Intermittent energy source: Wind energy is an intermittent energy source, which means that it is not available all the time.For APES, know the keywords: intermittency, capacity factor, wind farm, and how wind integrates with the grid (ENG-3.R and ENG-3.S)."
+   }
+  ],
+  "impact of solar power on electrical grid stability studies": [
+   {
+    "title": "Inertia Is a Growing Challenge for the Grid, But There... | EPRI Journal",
+    "href": "https://eprijournal.com/inertia-is-a-growing-challenge-for-the-grid-but-there-are-solutions/",
+    "body": "An EPRI study looks at the potential impacts of reduced inertia on frequency stability in the world’s electric power grids and reviews emerging solutions."
+   },
+   {
+    "title": "As more solar and wind come onto the grid, prices go down but new...",
+    "href": "https://theconversation.com/as-more-solar-and-wind-come-onto-the-grid-prices-go-down-but-new-questions-come-up-96704",
+    "body": "Large-scale solar and wind tend to push energy prices down, which sounds great as a consumer. But that makes keeping the grid in constant balance harder."
+   },
+   {
+    "title": "Virtual Synchronous Machines and Grid... - Power Electronics News",
+    "href": "https://www.powerelectronicsnews.com/enhancing-future-grids-stability-reliability-and-scalability-using-vsm-and-syndem-architecture/",
+    "body": "RES with the electrical grid. Enhancing Future Grid’s Stability, Reliability, and Scalability using VSM and SYNDEM Architecture. Figure 1: The global renewables share of electricity generation is expected to rise from 33% in 2025 to 37% in 2027 (Source: IEA 2026)."
+   },
+   {
+    "title": "Solar Power's Hidden Economic Impact: 5 Surprising Ways It Benefits...",
+    "href": "https://www.eurosolar.com.au/blog/solar-powers-hidden-economic-impact-5-surprising-ways-it-benefits-your-bottom-line/",
+    "body": "Solar panels generate electricity independently from the grid, effectively locking in energy rates for the 25-30 year lifespan of the system. This provides a hedge against future price increases, as the cost of solar remains stable while utility rates climb."
+   },
+   {
+    "title": "Study Finds Solar Power Growth Poses Challenge for Grid",
+    "href": "https://solarbuildermag.com/news/study-finds-solar-power-growth-poses-challenge-for-grid/",
+    "body": "“Solar power has great potential as a source of renewable energy as developers continue to innovate and reduce the cost of PV production,” said David M. Rouls, managing director, Accenture Smart Grid Services."
+   }
+  ],
+  "impact of wind power on electrical grid stability studies": [
+   {
+    "title": "Impact of Wind Energy on the Electric Grid | Tethys",
+    "href": "https://tethys.pnnl.gov/publications/impact-wind-energy-electric-grid",
+    "body": "The most important characteristics of wind turbines and wind plants that will impact their ability to be effectively integrated into the electrical grid on a large scale without significantly affecting the grid's reliability are power quality, low‐voltage ride‐through, reactive power control..."
+   },
+   {
+    "title": "Connection of large-scale wind power generation to the Dutch...",
+    "href": "https://repository.tudelft.nl/record/uuid:6fef6b25-58c2-42d4-8271-b00b5ddb00b4",
+    "body": "The impact of large scale wind power integration on transient stability in the Dutch grid was studied. For the simulations the Dutch part of the UCTE interconnected system load flow model was used."
+   },
+   {
+    "title": "Virtual Synchronous Machines and Grid... - Power Electronics News",
+    "href": "https://www.powerelectronicsnews.com/enhancing-future-grids-stability-reliability-and-scalability-using-vsm-and-syndem-architecture/",
+    "body": "This unprecedented requirement for electricity is driving the electrical grid operators increasingly toward solar and wind power because they can be built much faster than traditional coal, oil, gas, or nuclear plants to meet the immediate capacity needs of the customers."
+   },
+   {
+    "title": "(PDF) Wind Energy Potential in Nigeria",
+    "href": "https://www.researchgate.net/publication/295546689_Wind_Energy_Potential_in_Nigeria",
+    "body": "Stability, Wind farm, Wind power integration. I. INTRODUCTION. Energy has a major impact on every aspect of our.impact of the wind turbines on the electric grid before the. turbines are installed or connected at distribution level."
+   },
+   {
+    "title": "The North American Wind Research... - Mesalands Community College",
+    "href": "https://www.mesalands.edu/news-releases/the-north-american-wind-research-and-training-center-shares-data-with-new-mexico-tech-to-enhance-the-future-research-of-wind-energy-technology/",
+    "body": "Dr. Kevin Wedeward, Professor and Chair of the Electrical Engineering Department at New Mexico Tech and graduate student David Breen, utilized the data collected from the 1.5 megawatt wind turbine at Mesalands, to study the impact wind farms have on the behavior and stability on the..."
    }
   ]
+ },
+ "pages": {
+  "https://en.wikipedia.org/wiki/Variable_renewable_energy": "The 150 MW Andasol solar power station is a commercial parabolic trough solar thermal power plant, in Spain. The Andasol plant uses tanks of molten salt to store solar energy so that it can continue generating electricity even after sunset.[1]\nGrids with high penetration of renewable energy sources generally need more flexible generation rather than baseload generation[2]\nVariable renewable energy (VRE) or intermittent renewable energy sources (IRES) are renewable energy sources that are not dispatchable (adjustable on demand) due to their fluctuating nature, such as wind power and solar power, as opposed to controllable renewable energy sources, such as dammed hydroelectricity or bioenergy, or relatively constant sources, such as geothermal power.\nThe use of small amounts of intermittent power has little effect on grid operations. Using larger amounts of intermittent power may require upgrades or even a redesign of the grid infrastructure.[3][4]\nOptions to absorb large shares of variable energy into the grid include using storage, improved interconnection between different variable sources to smooth out supply, using dispatchable energy sources such as hydroelectricity and having overcapacity, so that sufficient energy is produced even when weather is less favourable. More connections between the energy sector and the building, transport and industrial sectors may also help.[5]: 55\nGlobal electricity generation from wind and solar reached 15% in 2024 (wind 8.1%, solar 6.9%), according to Ember's Global Electricity Review 2025.[6] Combined, they overtook hydropower for the first time. Low-carbon sources (renewables + nuclear) supplied 40.9% of global electricity. In 2024, several countries exceeded 40% wind + solar shares of generation, including Denmark (≈69%), Lithuania (≈65%), Luxembourg (≈54%), Portugal (≈45%), the Netherlands (≈45%), Spain (≈43%), and Uruguay (≈43%).[7][8] Characteristics of variable renewables include their unpredictability, variability, and low operating costs.[9] These, along with renewables typically being asynchronous generators, provide a challenge to grid operators, who must make sure supply and demand are matched. Solutions include energy storage, demand response, availability of overcapacity and sector coupling.[10] Smaller isolated grids may be less tolerant to high levels of penetration.[3][11]\nMatching power demand to supply is not a problem specific to intermittent power sources. Existing power grids already contain elements of uncertainty including sudden and large changes in demand and unforeseen power plant failures. Though power grids are already designed to have some capacity in excess of projected peak demand to deal with these problems, significant upgrades may be required to accommodate large amounts of intermittent power.[12]\nSeveral key terms are useful for understanding the issue of intermittent power sources. These terms are not standardized, and variations may be used. Most of these terms also apply to traditional power plants.\nIntermittency or variability is the extent to which a power source fluctuates. This has two aspects: a predictable variability, such as the day-night cycle, and an unpredictable part (imperfect local weather forecasting).[13] The term intermittent can be used to refer to the unpredictable part, with variable then referring to the predictable part.[14]\nDispatchability is the ability of a given power source to add output on demand. The concept is distinct from intermittency; dispatchability is one of several ways system operators match supply (generator's output) to system demand (technical loads).[15]\nPenetration is the amount of electricity generated from a particular source as a percentage of annual consumption.[16]\nNominal power or nameplate capacity is the theoretical output registered with authorities for classifying the unit. For intermittent power sources, such as wind and solar, nameplate power is the source's output under ideal conditions, such as maximum usable wind or high sun on a clear summer day.\nCapacity factor, average capacity factor, or load factor is the ratio of actual electrical generation over a given period of time, usually a year, to actual generation in that time period. Basically, it is the ratio between the how much electricity a plant produced and how much electricity a plant would have produced if were running at its nameplate capacity for the entire time period.\nFirm capacity or firm power is \"guaranteed by the supplier to be available at all times during a period covered by a commitment\".[17]\nCapacity credit: the amount of conventional (dispatchable) generation power that can be potentially removed from the system while keeping the reliability, usually expressed as a percentage of the nominal power.[18][example needed][clarification needed]\nForeseeability or predictability is how accurately the operator can anticipate the generation:[19] for example tidal power varies with the tides but is completely foreseeable because the orbit of the moon can be predicted exactly, and improved weather forecasts can make wind power more predictable.[20]\nDammed hydroelectricity, biomass and geothermal are dispatchable as each has a store of potential energy; wind and solar without storage can be decreased (curtailed) but are not dispatchable.\nDay ahead prediction and actual wind power\nGrid operators use day ahead forecasting to determine which of the available power sources to use the next day, and weather forecasting is used to predict the likely wind power and solar power output available. Although wind power forecasts have been used operationally for decades, as of 2019[update] the IEA is organizing international collaboration to further improve their accuracy.[21]\nErie Shores Wind Farm monthly output over a two-year period\nA wind farm in Muppandal, Tamil Nadu, India\nWind-generated power is a variable resource, and the amount of electricity produced at any given point in time by a given plant will depend on wind speeds, air density, and turbine characteristics, among other factors. If wind speed is too low then the wind turbines will not be able to make electricity, and if it is too high the turbines will have to be shut down to avoid damage. While the output from a single turbine can vary greatly and rapidly as local wind speeds vary, as more turbines are connected over larger and larger areas the average power output becomes less variable.[12]\nIntermittence: Regions smaller than synoptic scale, less than about 1000 km long, the size of an average country, have mostly the same weather and thus around the same wind power, unless local conditions favor special winds. Some studies show that wind farms spread over a geographically diverse area will as a whole rarely stop producing power altogether.[22][23] This is rarely the case for smaller areas with uniform geography such as Ireland,[24][25][26] Scotland[27] and Denmark which have several days per year with little wind power.[28]\nCapacity factor: Wind power typically has an annual capacity factor of 25–50%, with offshore wind outperforming onshore wind.[29]\nDispatchability: Because wind power is not by itself dispatchable wind farms are sometimes built with storage.[30][31]\nCapacity credit: At low levels of penetration, the capacity credit of wind is about the same as the capacity factor. As the concentration of wind power on the grid rises, the capacity credit percentage drops.[32][33]\nVariability: Site dependent.[34] Sea breezes are much more constant than land breezes.[12] Seasonal variability may reduce output by 50%.[35]\nReliability: A wind farm has high technical reliability when the wind blows. That is, the output at any given time will only vary gradually due to falling wind speeds or storms, the latter necessitating shut downs. A typical wind farm is unlikely to have to shut down in less than half an hour at the extreme, whereas an equivalent-sized power station can fail totally instantaneously and without warning. The total shutdown of wind turbines is predictable via weather forecasting. The average availability of a wind turbine is 98%, and when a turbine fails or is shut down for maintenance it only affects a small percentage of the output of a large wind farm.[36]\nPredictability: Although wind is variable, it is also predictable in the short term. There is an 80% chance that wind output will change less than 10% in an hour and a 40% chance that it will change 10% or more in 5 hours.[37]\nBecause wind power is generated by large numbers of small generators, individual failures do not have large impacts on power grids. This feature of wind has been referred to as resiliency.[38]\nDaily solar output at AT&T Park in San Francisco\nSeasonal variation of the output of the solar panels at AT&T park in San Francisco\nIntermittency inherently affects solar energy, as the production of renewable electricity from solar sources depends on the amount of sunlight at a given place and time. Solar output varies throughout the day and through the seasons, and is affected by dust, fog, cloud cover, frost or snow. Many of the seasonal factors are fairly predictable, and some solar thermal systems make use of heat storage to produce grid power for a full day.[39]\nVariability: In the absence of an energy storage system, solar does not produce power at night, little in bad weather and varies between seasons. In many countries, solar produces most energy in seasons with low wind availability and vice versa.[40]\nCapacity factor Standard photovoltaic solar has an annual average capacity factor of 10-20%,[41] but panels that move and track the sun have a capacity factor up to 30%.[42] Thermal solar parabolic trough with storage 56%.[43] Thermal solar power tower with storage 73%.[43]\nThe impact of intermittency of solar-generated electricity will depend on the correlation of generation with demand. For example, solar thermal power plants such as Nevada Solar One are somewhat matched to summer peak loads in areas with significant cooling demands, such as the south-western United States. Thermal energy storage systems like the small Spanish Gemasolar Thermosolar Plant can improve the match between solar supply and local consumption. The improved capacity factor using thermal storage represents a decrease in maximum capacity, and extends the total time the system generates power.[44][45][46]\nIn many countries new large dams are no longer being built, because of the environmental impact of reservoirs. Run of the river projects have continued to be built.[47] The absence of a reservoir results in both seasonal and annual variations in electricity generated.\nTidal power is the most predictable of all the variable renewable energy sources. The tides reverse twice a day, but they are never intermittent, on the contrary they are completely reliable.[48]\nWaves are primarily created by wind, so the power available from waves tends to follow that available from wind, but due to the mass of the water is less variable than wind power. Wind power is proportional to the cube of the wind speed, while wave power is proportional to the square of the wave height.[49][50][51]\nEnergy from sunlight or other renewable energy is converted to potential energy for storage in devices such as electric batteries. The stored potential energy is later converted to electricity that is added to the power grid, even when the original energy source is not available.\nThe displaced dispatchable generation could be coal, natural gas, biomass, nuclear, geothermal or storage hydro.[citation needed][clarification needed] Rather than starting and stopping nuclear or geothermal, it is cheaper to use them as constant base load power. Any power generated in excess of demand can displace heating fuels, be converted to storage or sold to another grid. Biofuels and conventional hydro can be saved for later when intermittents are not generating power. Some forecast that “near-firm” renewables (bat",
+  "https://accelerate-solar.com/blog/is-solar-and-wind-energy-reliable/": "Is Solar and Wind Energy Reliable? The Data Explained Skip to content\nSolar and wind are reliable once storage and grid balancing back them up, NREL modeling shows storage-backed renewable grids reaching 99.97% reliability. The pair hit 17% of US generation in 2025, 19% with rooftop included. The intermittency concern is real but solvable, it's about system design (storage, transmission, demand response), not whether the underlying resource is trustworthy.\nIs solar and wind energy reliable? Short answer: yes, once storage and grid balancing back them up. Wind and solar together supplied a record 17% of US electricity in 2025, or 19% counting rooftop systems (EIA, March 2026), and NREL modeling shows storage-backed renewable grids reaching 99.97% reliability. Reliable and dispatchable aren't the same thing. The question isn't whether the sun always shines; it's whether the total system, panels, wind turbines, storage, and grid, delivers power when households need it.\nConsider a solar farm at full output on a cloudless afternoon. At dusk its output drops to zero, but a nearby ridge of wind turbines picks up as the evening breeze strengthens. That handoff is exactly why grid planners pair them: the combined profile is far more stable than either source alone. The same logic scales down to a single property, though the economics do not scale with it, which is the argument we work through in hybrid solar and wind setups.\nWhat Does \"Reliable\" Actually Mean for an Energy Source?\nReliability in electricity means one thing: power reaches the meter when the consumer needs it. Engineers use two metrics. Capacity factor measures energy produced relative to a plant's theoretical maximum over a year. Availability measures the share of time a plant is operational and ready to generate. They aren't the same number, and conflating them causes most reliability confusion about renewables. A gas peaker might have 90% availability but a 10% capacity factor: it can run anytime, but operators rarely call on it. A solar panel has 99%+ availability (no moving parts) but a 20% capacity factor because the sun sets.\nHow Do Solar, Wind, and Gas Capacity Factors Compare?\nThe US Energy Information Administration publishes annual capacity-factor averages for every major source. The differences are significant, and context matters as much as the numbers.\nHigher in Southwest; lower in cloudy Northeast\nBest sites: Great Plains, offshore Atlantic\nDispatchable; used for baseload and peaking\nDeclining US fleet; many plants near retirement\nSources: EIA Electric Power Monthly Table 6.07A, 2024; NREL Capacity Factors for Utility-Scale Generators, 2021. Table reflects the 2023 fleet, kept as a like-for-like comparison across all seven sources.\nTwo years on, the picture has barely moved, which is itself the point. EIA's 2025 figures put utility-scale solar at 24.4% (up from 23.2% in 2024), nuclear at 91.0%, gas combined cycle at 58.4% and coal at 48.7%. Capacity factors are a property of the resource and the fleet, not a technology race, so they drift by fractions of a point while installed capacity doubles.\nAnd that gap between capacity factor and actual contribution is where the argument usually goes wrong. Solar's capacity factor is the lowest number in the table, yet utility-scale solar still delivered 296,000 GWh in 2025, about 6.7% of everything the country generated, with wind adding another 10.5%. A low capacity factor on a large enough fleet beats a high one on a small fleet, every time.\nThese figures do confirm what critics point out: solar and wind capacity factors are lower than gas or nuclear. But they miss two things. Capacity factor isn't cost, solar and wind have near-zero fuel costs, so lower capacity factors don't mean proportionally higher electricity prices. And capacity factor is a physical characteristic to manage, not a fatal flaw to fear.\nWhat Is Solar Intermittency and Why Does It Matter?\nIntermittency means solar and wind output varies with weather. Solar drops to zero at night and falls under thick cloud; wind is zero in calm weather and curtailed in extreme storms. Both are predictable hours to days ahead, which is very different from random. Grid operators have always managed variable demand and unexpected outages; the problem isn't new, just larger with high renewable shares. Three solutions run at commercial scale: battery storage for short gaps (4-12 hours), pumped hydro for multi-day storage, and geographic diversification through transmission. In our analysis of US Southwest homes, battery-backed arrays hit 85-95% self-sufficiency with correctly sized storage even in winter (30% lower output), with the grid covering the remaining 5-15% during multi-day storms.\nHow Does Battery Storage Fix the Reliability Gap?\nNREL's 2021 Storage Futures Study modeled widespread storage deployment (100+ GW across multiple scenarios) and found storage-plus-renewables portfolios can reach 99.97% reliability or better, matching fossil-fuel grids across all hours of the year, not just average conditions. Storage type, duration, and geographic distribution matter as much as total installed capacity.\nFor homes, storage means backup during outages and full use of solar that would otherwise be exported. The Tesla Powerwall 3 delivers 13.5 kWh usable per unit at 11.5 kW continuous, enough to carry a typical home's critical loads through the night on one day's generation. The Enphase IQ Battery 5P is modular at 5 kWh per unit, stackable to 15 kWh, integrating natively with Enphase microinverters.\nSolar and wind aren't unreliable, they're intermittent. Storage-backed renewable grids already hit 99.97% reliability, matching the fossil-fuel systems they replace.\nDoes Grid-Scale Renewable Energy Actually Work in Practice?\nThe most compelling answer isn't modeling, it's grids already running on high renewable shares. South Australia generates over 70% of its electricity from wind and solar, hasn't had a renewable-attributable blackout since the 150 MW Hornsdale Power Reserve battery went in in 2017, and exports surplus to neighboring states. Germany exceeded 60% renewable electricity in 2024 while holding grid frequency. Texas, despite its 2021 winter storm crisis (caused by uninsulated gas equipment, not renewables), now leads US states in wind generation. And the seven European countries above 40% renewable share, Denmark, Germany, Spain, Portugal, Ireland, Greece, and Austria, all held frequency within +-0.2 Hz of 50 Hz for more than 99.9% of hours in 2023. Renewable penetration and grid reliability weren't inversely correlated in any of them.\nWhat Are the Reliability Risks That Remain?\nHonest analysis names what storage and diversification don't fully solve. Multi-week low-wind, low-sun periods, Germany's \"Dunkelflaute\" (dark doldrums), can persist 7-14 days, beyond practical battery durations, so grids need dispatchable backup: gas peakers, nuclear, or demand response. The second risk is geographic concentration: a solar-heavy grid where weather is synchronized (the whole US Southeast clouding over at once) sees larger simultaneous drops than a dispersed mixed portfolio. That's why IRENA and IEA recommend diverse solar-plus-wind-plus-storage portfolios over single-source buildouts.\nThe debate often frames solar and wind against a hypothetical \"perfectly reliable\" fossil alternative. But gas peakers averaged just 9.8% capacity factor in 2023, sitting idle 90% of the time. The real comparison is system reliability, not plant reliability, and a correctly sized solar-plus-storage system can beat a peaker on it. Reliability also has to hold over decades, and it does: panels lose about 0.5% output per year, so how solar panels age still leaves 85-90% of rated power at 25 years.\nHow Reliable Is Residential Solar With Battery Backup?\nFor homeowners, the question is practical: will my lights stay on? A well-designed residential solar system with battery backup changes the calculus. The average US home uses 10,500 kWh per year, roughly 29 kWh per day. An 8 kW system in a mid-latitude location generates 8,000-11,000 kWh per year, enough to cover annual consumption.\nA single Powerwall 3 (13.5 kWh usable) covers overnight demand on the previous day's generation in most seasons. Critical loads (refrigerator, lighting, device charging, one HVAC zone) draw 1-3 kW, extending runtime to 4-12 hours; two units cover most two-day low-solar events. Sizing starts with your daily kWh, roof orientation, and local irradiance data. See also the environmental benefits of solar, where solar is deployed, and why solar energy is sustainable over its lifecycle.\nSolar and wind are intermittent but not unreliable, the distinction is meaningful. US solar averages a 24.6% capacity factor, onshore wind 34.6%, compared to 57.1% for gas combined-cycle. Neither solar nor wind is dispatchable on demand, but battery storage, grid interconnection, and geographically diverse renewable portfolios close the gap. NREL modeling confirms storage-backed renewable grids can achieve 99.97% reliability. Operational evidence from South Australia, Germany, and Denmark shows high-renewable grids maintaining grid stability in practice, not just theory. For residential installations, a correctly sized solar-plus-battery system covers 80-95% of annual consumption, with the grid providing backup for multi-day weather events. The reliability question is answered, the remaining challenge is the pace and cost of deploying the storage and transmission that makes high renewable shares work at scale.\nIs solar energy reliable enough to power a home?\nYes, with the right sizing and battery backup. A residential solar system paired with a battery such as a Tesla Powerwall 3 can cover 80-95% of a home's energy needs in most US climates. Solar capacity factors average 15-25% across the US, which means correct sizing for annual consumption, not instantaneous peak, is the design goal. Off-peak storage fills the gaps.\nWhat is the capacity factor of solar panels?\nUS utility-scale solar capacity factors averaged 24.6% in 2023, according to EIA data. That means a 10 kW system generates energy equivalent to running at full power for about 2,160 hours per year. Rooftop residential systems typically land at 15-22% depending on location, tilt, and shading. The US Southwest reaches 28-32% capacity factors.\nOnshore wind averages 25-35% capacity factor in good sites, slightly above typical solar at 15-25%. Offshore wind reaches 40-45%. Neither is dispatchable on its own, both depend on weather conditions. When combined on a mixed grid, their output profiles complement each other: wind is often stronger at night and in winter when solar is weak, improving combined reliability.\nHow do you store solar energy for use at night?\nLithium-ion battery systems like the Tesla Powerwall 3 (13.5 kWh usable) and Enphase IQ Battery 5P (5 kWh usable) store surplus daytime solar generation for evening and overnight use. At grid scale, pumped hydro storage provides the largest share of stored energy globally, covering multi-day gaps in renewable output.\nDo solar and wind cause grid instability?\nHigh penetrations of solar and wind require active grid management, more transmission, faster-response backup, and storage, but do not inherently cause instability. South Australia generates over 70% of its electricity from renewables and maintains grid stability using a combination of batteries, demand response, and gas peakers. Germany exceeded 60% renewable electricity in 2024 with a reliable grid.\nNREL: Capacity Factors for Utility-Scale Generators Not Primarily Using Fossil Fuels\nIEA: Renewables 2024: Analysis and Forecast to 2030\nEIA: Electric Power Monthly, Table 6.07A, Capacity Factors for Utility Scale Generators\nNREL: Storage Futures Study: Grid Operational Impacts of Widespread Storage Deployment",
+  "https://co2coalition.org/2023/04/25/solar-and-wind-are-insulting-non-solutions-for-energy-poor-africans/": "Solar and Wind are Insulting Non-Solutions for Energy-Poor Africans - CO2 Coalition\nSolar and Wind are Insulting Non-Solutions for Energy-Poor Africans\nMore than half the population of sub-Saharan Africa lives without reliable electricity, hindering the region’s development and economic growth. Even basic services in hospitals are a rarity due to insufficient power supplies.\nOffers of off-grid wind and solar energy as a solution demonstrate a lack of both a long-term vision and a proper understanding of energy systems. Such approaches deny rural Africans the energy independence and economic development they deserve.\nAs of 2023, approximately 770 million people in Africa and Asia lacked access to electricity, with Sub-Saharan Africa being the most affected region. In Senegal, for example, less than half of the healthcare facilities had access to electricity. According to the World Health Organization (WHO), the African country with the least healthcare facilities on a per capita basis in 2017 was the Central African Republic. Other countries similarly lacking included South Sudan, Mali, Chad, and Benin.\nInsufficient power supplies “severely limits adoption of emerging technologies in sectors such as banking, education, agriculture, and finance that could otherwise alleviate some of the core challenges facing Africans,” writes Nirav Patel, a former Brookings analyst.\nLack of access to electricity reduces the probability of employment by approximately 35 percent, according to World Bank data. The overall quality of life decreases, with many households relying on kerosene lamps, charcoal, wood, and candles for basic needs like lighting and cooking.\nMany healthcare centers operate without ventilators, X-ray machines, CT scanners, and incubators. Such facilities experience a 43 percent increase in mortality for each day power is unavailable for more than two hours, according to a study published in Global Public Health.\nInstead of devising policies to provide reliable grid electricity to energy-starved people, many international organizations and funding groups propose off-grid energy development – particularly solar installations.\nThe disadvantages of solar include its intermittency and expense. Solar panels are costly to install, are vulnerable to damage by storms, demand continual maintenance, and require comparatively huge amounts of materials and land to produce the same amount of electricity as plants powered by fossil and nuclear fuels.\nEven large solar energy systems are not capable of meeting high demands for electricity because of the low-capacity factor.\nThe capacity factor of a power plant is a measure of how close the actual power produced by the plant over a given period is to the theoretical maximum power that the plant could produce if it were to operate continuously at maximum output.\nOne of the reasons the capacity factor of solar panels is lower than that of solid fuels such as coal is the intermittent nature of solar energy. The full strength of the sun is not always available because of clouds, fog, and nightfall. Even dust on the panels diminishes their effectiveness.\nDepending on a region’s wind patterns, wind energy’s intermittency can be even worse.\nIn contrast, solid fuels typically operate at close to their maximum capacity for extended periods of time without interruption.\nThere is a big difference between experimenting with solar and wind in advanced economies of the West and doing the same in regions of extreme poverty where there is no grid electricity to back up failures of intermittent technologies. It makes no sense to propose inefficient solutions to the grave problems of people struggling to survive the deprivations of abject poverty.\nPolicymakers do not feel the brutal pain of energy impoverishment in their comfortable offices in Europe and North America as they divert billions of public funds into solar and wind installations in Africa. Such callousness toward the poor is intolerable.\nThis commentary was first published at BizPac Review, April 25, 2023, and can be accessed here.\nVijay Jayaraj is a Research Associate at the CO2 Coalition, Arlington, Virginia. He holds a master’s degree in environmental sciences from the University of East Anglia, UK and resides in India.\nTags: Africa, Reliable Energy, Vijay Jayaraj\nSubscribe to Our Informative Weekly Newsletter Here:\nThe CO2 Coalition was established in 2015 as a 501(c)(3) for the purpose of educating thought leaders, policy makers, and the public about the important contribution made by carbon dioxide to our lives and the economy.\nCopyright - CO2 Coalition - All Rights Reserved",
+  "https://www.whoi.edu/science/coastaltraining/events/pdf/RERL-facts/2a_Capacity_Factor.pdf": null,
+  "https://geo.mtu.edu/KeweenawGeoheritage/MiTEP_ESI-2/Wind_files/RERL_Fact_Sheet_2a_Capacity_Factor.pdf": null
  },
  "expected": {
   "status": "completed",
@@ -290,19 +397,21 @@
    "PASS"
   ],
   "open_issues": [
-   []
+   [
+    "minor:critic"
+   ]
   ],
   "replans": 0,
   "recoveries": 0,
   "subtasks": [
-   "analyze_grid_impact:done",
-   "criticize_analysis:done",
+   "analyze_comparison:done",
+   "critique_analysis:done",
    "research_solar:done",
    "research_wind:done",
    "write_brief:done"
   ],
-  "evidence": 8,
-  "brief_sha256": "39462bcdf1cdf61b",
+  "evidence": 10,
+  "brief_sha256": "604a40c7bb8e6b05",
   "cited": [
    1,
    2,
@@ -310,8 +419,9 @@
    4,
    5,
    6,
-   7,
-   8
+   8,
+   9,
+   10
   ],
   "validated": true
  }
