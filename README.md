@@ -124,7 +124,8 @@ Both the critic-rejection and recovery paths are triggerable on demand for a dem
 | **Dynamic decomposition** | LLM returns a structured Pydantic `Plan` (subtasks + roles + `depends_on`), validated for cycles/dupes/size. Different goals → structurally different plans. |
 | **Separate contexts** | Each subagent has its own system prompt and sees only its task + relevant structured inputs — the only cross-agent hand-off is structured data via the supervisor. |
 | **Bounded parallelism** | Independent researchers run concurrently in a thread pool capped at `MAX_PARALLEL` (default 2); dependents wait. Concurrency is *observed* so the claim is measurable. |
-| **Critic loop** | Real REJECT-with-feedback that routes work back, bounded by `MAX_CRITIC_ITERS`; degrades gracefully at the ceiling. |
+| **Critic loop** | A structured review, not a vibe check. Code first checks what needs no model (uncited claims, citations to evidence that doesn't exist, figures that aren't in the evidence they cite, no recommendation when one is asked). The model then checks every claim against its cited evidence (supported, partial, overstated, miscited, unsupported, contradicted) and raises issues by severity; **the verdict is decided in code** from those findings. A re-review must confirm each fix and may only add new blockers, and a revision that fixes nothing stops the loop. Bounded by `MAX_CRITIC_ITERS`; degrades gracefully at the ceiling. |
+| **Grounded agents** | The Analyst cites evidence numbers on every claim and revises from its previous draft against numbered issues. Researchers' findings are dropped if their source isn't one of the results they were shown, and near-duplicates are removed. The Writer leaves out claims the critic found unsupported and states unresolved issues as caveats. |
 | **Visible recovery** | retry → re-delegate → degrade, bounded by `MAX_RECOVERY_ATTEMPTS`; every rung is a trace event. |
 | **Rate-limit resilience** | Every LLM/tool call is wrapped in exponential backoff + jitter (tenacity), retrying 429s **and** transient 5xx/network errors — added after a live Gemini 503. |
 | **Loop & cost control** | `MAX_STEPS` backstop + stall/repeat detectors so a multi-agent run can't spiral in calls or cost. |
@@ -144,7 +145,7 @@ git clone https://github.com/krishivsaini/Maestro.git
 cd Maestro
 uv sync                       # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 76 passed, 1 skipped
+# run the full test suite (offline, no API key) — 110 passed, 1 skipped
 uv run pytest
 
 # see the coordination in the browser
@@ -227,7 +228,8 @@ What the free tier costs you, concretely:
 - **Retrieval is simple**, not production RAG — web/knowledge lookups + a small local corpus, enough
   to produce evidence-backed briefs, not a tuned retrieval stack.
 - **Evaluation is lightweight** — ~15 scripted cases that demonstrate behavior (including failure and
-  recovery), not a metrics framework; final output quality is hand-judged.
+  recovery), plus a 24-draft seeded-flaw set for the critic (below); not a metrics framework, and final
+  output quality is hand-judged.
 - **One task domain** (analytical briefs) — chosen because it genuinely decomposes across specialists;
   the orchestration generalizes, the prompts are domain-specific.
 - **Free-tier concurrency cap** — `MAX_PARALLEL=2` because the Gemini free tier is ~10 RPM and one run
@@ -239,7 +241,25 @@ What the free tier costs you, concretely:
 
 ## Tests
 
-`uv run pytest` → **76 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
+`uv run pytest` → **110 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
-exceeded, dependents wait), `test_critic_loop`, `test_recovery`, `test_loop_control`, plus memory,
-trace-replay, service, and writer-citation tests.
+exceeded, dependents wait), `test_critic_loop`, `test_critic_review`, `test_recovery`, `test_loop_control`,
+plus memory, trace-replay, service, guardrail and writer-citation tests.
+
+### Critic evaluation
+
+`scripts/critic_eval.py` runs a critic over `data/critic_eval_cases.json`: per topic, a clean draft that is
+correct against its evidence and five copies with one planted flaw each. A good critic rejects every flawed
+draft and passes every clean one. The critic before the structured review is reproduced in the script, shown
+the same citations, so the comparison measures the reviewing rather than access to information.
+
+| Critic (model) | Flaws caught | Clean drafts passed |
+|---|---|---|
+| Before: PASS/REJECT verdict (`gemini-3.5-flash-lite`) | 12 / 20 | 4 / 4 |
+| Structured review (`gemini-3.5-flash-lite`, the default) | 20 / 20 | 4 / 4 |
+| Structured review (`gemini-3.6-flash`) | 19 / 20 | 4 / 4 |
+
+The old critic caught none of the wrong citations. One topic (`k8s-swarm`) was written after the critic
+was tuned on the other three and run once, to check the result isn't fitted to the tuning cases: the new
+critic caught 5/5 there, the old one 3/5. Each run is 24 live calls, paced for the free tier's
+15 requests/minute.

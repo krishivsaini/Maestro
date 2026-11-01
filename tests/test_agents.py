@@ -38,7 +38,7 @@ def analyst_responder(schema, messages):
     assert "Evidence:" in human
     return AnalysisModel(
         content="Solar and wind are complementary; storage bridges solar's evening gap.",
-        claims=["storage is the swing factor", "wind has a higher capacity factor"],
+        claims=["storage is the swing factor [1]", "wind has a higher capacity factor [1]"],
     )
 
 
@@ -97,7 +97,7 @@ def test_analyst_passes_feedback_into_context(make_stub):
 
     def responder(schema, messages):
         captured["human"] = messages[-1][1]
-        return AnalysisModel(content="revised", claims=["c"])
+        return AnalysisModel(content="revised", claims=["c [1]"])
 
     a = Analyst(model=make_stub(responder))
     a.run(
@@ -122,7 +122,7 @@ def test_analyst_context_is_scoped_to_structured_evidence(make_stub):
     def responder(schema, messages):
         captured["system"] = messages[0][1]
         captured["human"] = messages[-1][1]
-        return AnalysisModel(content="x", claims=["c"])
+        return AnalysisModel(content="x", claims=["c [1]"])
 
     a = Analyst(model=make_stub(responder))
     ev = [Evidence(subtask_id="r1", source="src_solar", content="UNIQUE_EVIDENCE_TOKEN")]

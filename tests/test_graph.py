@@ -42,13 +42,14 @@ def build_stub_agents(make_stub, critic_decisions):
             )
         if name == "AnalysisModel":
             human = messages[-1][1]
-            tag = "revised" if "critic feedback" in human.lower() else "initial"
-            return AnalysisModel(content=f"{tag} analysis of solar vs wind", claims=["c1", "c2"])
+            tag = "revised" if "open issues from the review" in human.lower() else "initial"
+            return AnalysisModel(content=f"{tag} analysis of solar vs wind", claims=["c1 [1]", "c2 [1]"])
         if name == "CriticOutput":
             d = critic_decisions[min(counter["ci"], len(critic_decisions) - 1)]
             counter["ci"] += 1
-            fb = "" if d == CriticDecision.passed else "claim c2 is unsupported; add a source"
-            return CriticOutput(decision=d, feedback=fb)
+            # a fresh complaint each review: progress without passing (a repeated one stalls)
+            fb = "" if d == CriticDecision.passed else f"claim c2 is unsupported; add a source (review {counter['ci']})"
+            return CriticOutput.scripted(d, fb, messages)
         if name == "WriterOutput":
             return WriterOutput(content="FINAL BRIEF: solar and wind are complementary.", citations=["src_solar", "src_wind"])
         raise AssertionError(f"unexpected schema {name}")

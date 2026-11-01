@@ -49,9 +49,9 @@ def build_agents(make_stub, researcher):
     def responder(schema, messages):
         name = getattr(schema, "__name__", "")
         if name == "AnalysisModel":
-            return AnalysisModel(content="analysis of solar vs wind", claims=["c1"])
+            return AnalysisModel(content="analysis of solar vs wind", claims=["c1 [1]"])
         if name == "CriticOutput":
-            return CriticOutput(decision=CriticDecision.passed, feedback="")
+            return CriticOutput.scripted(CriticDecision.passed, "", messages)
         if name == "WriterOutput":
             return WriterOutput(content="FINAL BRIEF", citations=["src"])
         raise AssertionError(f"unexpected schema {name}")

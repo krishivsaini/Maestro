@@ -38,10 +38,10 @@ def build_agents(make_stub, cfg, critic_decision):
     def responder(schema, messages):
         name = getattr(schema, "__name__", "")
         if name == "AnalysisModel":
-            return AnalysisModel(content="analysis", claims=["c1", "c2"])
+            return AnalysisModel(content="analysis", claims=["c1 [1]", "c2 [1]"])
         if name == "CriticOutput":
             fb = "" if critic_decision == CriticDecision.passed else "claim c2 is unsupported"
-            return CriticOutput(decision=critic_decision, feedback=fb)
+            return CriticOutput.scripted(critic_decision, fb, messages)
         if name == "WriterOutput":
             return WriterOutput(content="BRIEF", citations=["s"])
         raise AssertionError(name)
@@ -74,7 +74,8 @@ def test_loop_detector_halts_stalled_critic(make_stub):
     cfg = Settings(max_steps=100, max_critic_iters=20, max_parallel=2)
     final = run_goal(GOAL, agents=build_agents(make_stub, cfg, CriticDecision.rejected))
     assert final["status"] == RunStatus.halted.value
-    assert final["critic_iterations"] == 3  # stopped at the stall threshold, not 20
+    # the same complaint survived a revision: stopped at the first re-review, not after 20
+    assert final["critic_iterations"] == 2
     assert "loop detector" in (final["final_output"].notes or "").lower()
 
 

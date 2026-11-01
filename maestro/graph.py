@@ -89,6 +89,22 @@ def _ev(event_type: EventType, agent: str, summary: str, **kw) -> TraceEvent:
     return TraceEvent(event_type=event_type, agent=agent, summary=summary, **kw)
 
 
+def _review_summary(v) -> dict:
+    """What a critic review found, for the trace: counts, and every issue with its status."""
+    claims: dict[str, int] = {}
+    for c in v.claim_checks:
+        claims[c.verdict] = claims.get(c.verdict, 0) + 1
+    return {
+        "decision": v.decision.value,
+        "open": {s: len(v.open_issues(s)) for s in ("blocker", "major", "minor")},
+        "resolved": sum(i.status == "resolved" for i in v.issues),
+        "stalled": v.stalled,
+        "claims": claims,
+        "issues": [i.model_dump(include={"id", "severity", "criterion", "problem", "status", "origin"})
+                   for i in v.issues],
+    }
+
+
 def _first_by_role(subtasks: list[Subtask], role: Role) -> Subtask:
     for s in subtasks:
         if s.role == role:
@@ -286,12 +302,18 @@ def build_graph(
     def analyze_node(state: MaestroState) -> dict:
         analyst_st = _first_by_role(state["subtasks"], Role.analyst)
         verdicts = state.get("critic_verdicts", [])
-        feedback = verdicts[-1].feedback if (verdicts and verdicts[-1].decision == CriticDecision.rejected) else None
+        last = verdicts[-1] if verdicts else None
+        rejected = last is not None and last.decision == CriticDecision.rejected
         revision = state.get("critic_iterations", 0)
         events: list[TraceEvent] = []
+        # A revision works from the reviewed draft and the numbered open issues, so it
+        # fixes what was flagged instead of rewriting from scratch.
         updated, draft = ag.analyst.run(
             analyst_st, state["goal"], state.get("evidence", []),
-            feedback=feedback, revision=revision, memory_hits=state.get("memory_hits", []),
+            feedback=last.feedback if rejected else None, revision=revision,
+            memory_hits=state.get("memory_hits", []),
+            previous=state.get("analysis") if rejected else None,
+            issues=last.open_issues("blocker", "major") if rejected else None,
             on_retry=_backoff_recorder(events, "analyst", subtask_id=analyst_st.id),
         )
         _emit(events, _ev(EventType.subagent_result, "analyst",
@@ -306,15 +328,17 @@ def build_graph(
     def critique_node(state: MaestroState) -> dict:
         critic_st = _first_by_role(state["subtasks"], Role.critic)
         iteration = state.get("critic_iterations", 0) + 1
+        verdicts = state.get("critic_verdicts", [])
         events: list[TraceEvent] = []
         updated, verdict = ag.critic.run(
             critic_st, state["goal"], state["analysis"], state.get("evidence", []),
-            iteration=iteration,
+            iteration=iteration, prior=verdicts[-1].issues if verdicts else None,
             on_retry=_backoff_recorder(events, "critic", subtask_id=critic_st.id),
         )
         etype = EventType.critic_pass if verdict.decision == CriticDecision.passed else EventType.critic_reject
         _emit(events, _ev(etype, "critic", f"review {iteration}: {verdict.decision.value}",
-                          subtask_id=critic_st.id, critic_verdict=verdict.decision.value))
+                          subtask_id=critic_st.id, critic_verdict=verdict.decision.value,
+                          data={"review": _review_summary(verdict)}))
         return {
             "critic_verdicts": [verdict],
             "critic_iterations": iteration,
@@ -329,6 +353,8 @@ def build_graph(
             return "write"
         if state.get("critic_iterations", 0) >= cfg.max_critic_iters:
             return "write"  # ceiling reached -> degrade gracefully
+        if last.stalled:
+            return "write"  # the revision fixed nothing: another round would not either
         # global safety nets: step ceiling or a stalled (no-progress) critic loop
         if step_ceiling_reached(state, cfg) or stuck_in_critic_loop(state):
             return "write"
@@ -346,13 +372,13 @@ def build_graph(
         if step_ceiling_reached(state, cfg):
             halt_reason = f"step ceiling (MAX_STEPS={cfg.max_steps}) reached"
         elif stuck_in_critic_loop(state) and state.get("critic_iterations", 0) < cfg.max_critic_iters:
-            halt_reason = "loop detector: critic gave identical feedback repeatedly without progress"
+            halt_reason = "loop detector: a revision fixed none of the critic's open issues"
 
         validated = critic_passed and halt_reason is None
         events: list[TraceEvent] = []
         updated, answer = ag.writer.run(
             writer_st, state["goal"], state["analysis"], state.get("evidence", []),
-            validated=validated,
+            validated=validated, review=verdicts[-1] if verdicts else None,
             on_retry=_backoff_recorder(events, "writer", subtask_id=writer_st.id),
         )
         notes = []

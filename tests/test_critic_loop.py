@@ -16,19 +16,23 @@ from maestro.state import AnalysisDraft, CriticDecision, Evidence, Role, Subtask
 EVIDENCE = [Evidence(subtask_id="r1", source="src", content="fact A"), Evidence(subtask_id="r2", source="src2", content="fact B")]
 ANALYSIS_SUBTASK = Subtask(id="analyze", description="compare", role=Role.analyst, depends_on=["r1", "r2"])
 CRITIC_SUBTASK = Subtask(id="critique", description="review", role=Role.critic, depends_on=["analyze"])
-INITIAL = AnalysisDraft(content="initial analysis", claims=["c1", "c2"], revision=0)
+INITIAL = AnalysisDraft(content="initial analysis", claims=["c1", "c2"], refs=[[1], [2]], revision=0)
 
 
-def critic_scripted(decisions):
-    """Critic responder that returns a scripted sequence of PASS/REJECT verdicts."""
+def critic_scripted(decisions, feedbacks=None):
+    """Critic responder that returns a scripted sequence of PASS/REJECT verdicts. Each
+    REJECT repeats the same complaint unless ``feedbacks`` gives one per review."""
     state = {"i": 0}
 
     def responder(schema, messages):
         assert schema is CriticOutput
-        d = decisions[min(state["i"], len(decisions) - 1)]
+        n = state["i"]
+        d = decisions[min(n, len(decisions) - 1)]
         state["i"] += 1
-        fb = "" if d == CriticDecision.passed else "Claim c2 is unsupported by the evidence; cite a source or drop it."
-        return CriticOutput(decision=d, feedback=fb)
+        fb = "" if d == CriticDecision.passed else (
+            feedbacks[min(n, len(feedbacks) - 1)] if feedbacks else
+            "Claim c2 is unsupported by the evidence; cite a source or drop it.")
+        return CriticOutput.scripted(d, fb, messages)
 
     return responder
 
@@ -36,8 +40,8 @@ def critic_scripted(decisions):
 def analyst_responder(schema, messages):
     assert schema is AnalysisModel
     human = messages[-1][1]
-    tag = "revised" if "critic feedback" in human.lower() else "initial"
-    return AnalysisModel(content=f"{tag} analysis addressing feedback", claims=["c1", "c2-with-source"])
+    tag = "revised" if "open issues from the review" in human.lower() else "initial"
+    return AnalysisModel(content=f"{tag} analysis addressing feedback", claims=["c1 [1]", "c2-with-source [1]"])
 
 
 # --- Critic agent parses both verdicts --------------------------------------
@@ -75,7 +79,9 @@ def test_reject_then_revise_then_pass(make_stub):
 # --- ceiling degrades instead of looping forever ----------------------------
 def test_ceiling_halts_and_degrades(make_stub):
     analyst = Analyst(model=make_stub(analyst_responder))
-    critic = Critic(model=make_stub(critic_scripted([CriticDecision.rejected])))  # always rejects
+    # always rejects, but over something new each time: progress, never a pass
+    critic = Critic(model=make_stub(critic_scripted([CriticDecision.rejected],
+                                                    feedbacks=["problem one", "problem two", "problem three"])))
     result = run_critic_loop(
         analyst=analyst,
         critic=critic,
@@ -104,3 +110,15 @@ def test_force_critic_reject_triggers_rejection(make_stub, monkeypatch):
     _, v = critic.run(CRITIC_SUBTASK, "goal", INITIAL, EVIDENCE, iteration=1)
     assert v.decision == CriticDecision.rejected
     assert "forced-reject" in v.feedback
+
+
+# --- a revision that fixes nothing stops the loop ---------------------------
+def test_stalled_revision_stops_before_the_ceiling(make_stub):
+    analyst = Analyst(model=make_stub(analyst_responder))
+    critic = Critic(model=make_stub(critic_scripted([CriticDecision.rejected])))  # the same complaint every time
+    result = run_critic_loop(
+        analyst=analyst, critic=critic, analysis_subtask=ANALYSIS_SUBTASK, critic_subtask=CRITIC_SUBTASK,
+        goal="Compare X and Y", evidence=EVIDENCE, draft=INITIAL, max_iters=5,
+    )
+    assert not result.passed and result.degraded
+    assert result.iterations == 2 and result.verdicts[-1].stalled  # stopped at the first re-review, not 5

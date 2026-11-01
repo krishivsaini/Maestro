@@ -1,0 +1,501 @@
+{
+  "_about": "Seeded-flaw cases for scripts/critic_eval.py. Each topic has evidence, a clean draft that is correct against that evidence (it should PASS), and flaws: copies of the clean draft with exactly one planted problem (each should be REJECTED). A flaw edits the clean draft by replacing text in its content and claims, or by adding a claim. The evidence is written for the test; the critic judges drafts only against it. Topics marked heldout were written after the critic was tuned on the others and run once, to check the result is not fitted to the tuning cases.",
+  "topics": [
+    {
+      "id": "solar-wind",
+      "goal": "Compare solar and wind energy for grid reliability, and recommend one.",
+      "evidence": [
+        [
+          "nrel.gov/solar-cf",
+          "Utility-scale solar PV in the US had an average capacity factor of about 24% in 2022."
+        ],
+        [
+          "eia.gov/wind-cf",
+          "US wind turbines averaged a capacity factor of about 35% in 2022."
+        ],
+        [
+          "iea.org/solar-profile",
+          "Solar output peaks around midday and falls to zero at night, so evening demand must be met by storage or other sources."
+        ],
+        [
+          "energy.gov/wind-variability",
+          "Wind output varies with weather and is often stronger at night and in winter, which partly complements solar's daily profile."
+        ],
+        [
+          "lazard.com/lcos-2023",
+          "Four-hour battery storage costs fell by roughly 70% between 2015 and 2023."
+        ],
+        [
+          "nerc.com/reliability-2023",
+          "Grid operators report that geographically dispersed wind farms reduce aggregate output variability compared with a single site."
+        ]
+      ],
+      "clean": {
+        "content": "Wind is the stronger option for grid reliability on this evidence. Its capacity factor (about 35% in 2022) is well above utility-scale solar's (about 24%), and its output is often stronger at night and in winter, which partly offsets solar's midday peak. Solar's main weakness is that it produces nothing at night, so evening demand depends on storage, although four-hour battery costs fell roughly 70% between 2015 and 2023. Spreading wind farms across a region reduces their combined variability. We recommend prioritising wind for reliability and adding solar with storage as battery costs keep falling; if storage becomes cheap enough to cover evening demand routinely, solar's case strengthens considerably.",
+        "claims": [
+          [
+            "Wind's capacity factor (about 35% in 2022) is higher than utility-scale solar's (about 24%).",
+            [
+              1,
+              2
+            ]
+          ],
+          [
+            "Solar produces nothing at night, so evening demand must be met by storage or other sources.",
+            [
+              3
+            ]
+          ],
+          [
+            "Wind output is often stronger at night and in winter, partly complementing solar.",
+            [
+              4
+            ]
+          ],
+          [
+            "Four-hour battery storage costs fell roughly 70% between 2015 and 2023.",
+            [
+              5
+            ]
+          ],
+          [
+            "Geographically dispersed wind farms reduce aggregate output variability.",
+            [
+              6
+            ]
+          ]
+        ]
+      },
+      "flaws": {
+        "unsupported": {
+          "content_append": " Wind farms also deliver 99.9% availability during peak demand.",
+          "add_claim": [
+            "Wind farms deliver 99.9% availability during peak demand.",
+            [
+              6
+            ]
+          ]
+        },
+        "wrong_citation": {
+          "claim_refs": {
+            "4": [
+              2
+            ]
+          }
+        },
+        "no_recommendation": {
+          "replace": [
+            [
+              "Wind is the stronger option for grid reliability on this evidence.",
+              "Wind and solar each contribute to grid reliability in different ways."
+            ],
+            [
+              "We recommend prioritising wind for reliability and adding solar with storage as battery costs keep falling; if storage becomes cheap enough to cover evening demand routinely, solar's case strengthens considerably.",
+              "Both technologies have strengths and weaknesses, and the right mix depends on local conditions."
+            ]
+          ]
+        },
+        "contradiction": {
+          "replace": [
+            [
+              "its output is often stronger at night and in winter, which partly offsets solar's midday peak",
+              "its output is usually weakest at night and in winter"
+            ],
+            [
+              "Wind output is often stronger at night and in winter, partly complementing solar.",
+              "Wind output is usually weakest at night and in winter."
+            ]
+          ]
+        },
+        "overclaim": {
+          "replace": [
+            [
+              "Spreading wind farms across a region reduces their combined variability.",
+              "Spreading wind farms across a region eliminates their output variability entirely."
+            ],
+            [
+              "Geographically dispersed wind farms reduce aggregate output variability.",
+              "Geographically dispersed wind farms eliminate output variability entirely."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "postgres-mongo",
+      "goal": "Should a startup use PostgreSQL or MongoDB for its first product?",
+      "evidence": [
+        [
+          "postgresql.org/docs/acid",
+          "PostgreSQL provides full ACID transactions across multiple tables by default."
+        ],
+        [
+          "mongodb.com/docs/transactions",
+          "MongoDB has supported multi-document ACID transactions since version 4.0, though its documentation advises modelling data to minimise their use."
+        ],
+        [
+          "survey.stackoverflow.co/2023",
+          "In the 2023 Stack Overflow developer survey, PostgreSQL was the most used database among professional developers, at about 49%."
+        ],
+        [
+          "postgresql.org/docs/jsonb",
+          "PostgreSQL's JSONB type stores and indexes semi-structured JSON documents."
+        ],
+        [
+          "mongodb.com/docs/sharding",
+          "MongoDB includes built-in horizontal sharding to distribute data across servers."
+        ],
+        [
+          "mongodb.com/blog/startups",
+          "A MongoDB company blog post argues that its flexible schema lets startups iterate faster in early development."
+        ]
+      ],
+      "clean": {
+        "content": "For a startup's first product, PostgreSQL is the safer option. It provides full multi-table ACID transactions by default, while MongoDB supports multi-document transactions but its own documentation advises designing to minimise them. PostgreSQL's JSONB type also stores and indexes semi-structured documents, which covers much of the flexibility MongoDB is usually chosen for, and it was the most used database among professional developers in the 2023 Stack Overflow survey (about 49%), which helps with hiring and tooling. MongoDB's built-in horizontal sharding is a genuine advantage at large scale, and MongoDB argues that its flexible schema speeds early iteration, though that claim comes from the vendor itself. We recommend PostgreSQL, and would revisit that if the product's data is overwhelmingly document-shaped or needs horizontal scale early.",
+        "claims": [
+          [
+            "PostgreSQL provides full multi-table ACID transactions by default.",
+            [
+              1
+            ]
+          ],
+          [
+            "MongoDB supports multi-document transactions, but its documentation advises minimising their use.",
+            [
+              2
+            ]
+          ],
+          [
+            "PostgreSQL's JSONB type stores and indexes semi-structured documents.",
+            [
+              4
+            ]
+          ],
+          [
+            "PostgreSQL was the most used database among professional developers in the 2023 Stack Overflow survey (about 49%).",
+            [
+              3
+            ]
+          ],
+          [
+            "MongoDB has built-in horizontal sharding.",
+            [
+              5
+            ]
+          ],
+          [
+            "MongoDB's own blog argues its flexible schema speeds early iteration.",
+            [
+              6
+            ]
+          ]
+        ]
+      },
+      "flaws": {
+        "unsupported": {
+          "content_append": " PostgreSQL queries also run about three times faster than MongoDB for typical startup workloads.",
+          "add_claim": [
+            "PostgreSQL queries run about three times faster than MongoDB for typical startup workloads.",
+            [
+              3
+            ]
+          ]
+        },
+        "wrong_citation": {
+          "claim_refs": {
+            "3": [
+              5
+            ]
+          }
+        },
+        "no_recommendation": {
+          "replace": [
+            [
+              "For a startup's first product, PostgreSQL is the safer option.",
+              "PostgreSQL and MongoDB both have strengths for a first product."
+            ],
+            [
+              "We recommend PostgreSQL, and would revisit that if the product's data is overwhelmingly document-shaped or needs horizontal scale early.",
+              "Each database suits different needs, so the decision depends on the team and the product."
+            ]
+          ]
+        },
+        "contradiction": {
+          "replace": [
+            [
+              "while MongoDB supports multi-document transactions but its own documentation advises designing to minimise them",
+              "while MongoDB does not support multi-document transactions at all"
+            ],
+            [
+              "MongoDB supports multi-document transactions, but its documentation advises minimising their use.",
+              "MongoDB does not support multi-document transactions."
+            ]
+          ]
+        },
+        "overclaim": {
+          "replace": [
+            [
+              "and MongoDB argues that its flexible schema speeds early iteration, though that claim comes from the vendor itself",
+              "and its flexible schema is proven to make startups iterate faster"
+            ],
+            [
+              "MongoDB's own blog argues its flexible schema speeds early iteration.",
+              "MongoDB's flexible schema is proven to make startups iterate faster."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "rest-graphql",
+      "goal": "Compare REST and GraphQL for a public API and recommend one.",
+      "evidence": [
+        [
+          "developer.mozilla.org/http-caching",
+          "HTTP GET responses can be cached by browsers and CDNs using standard cache headers."
+        ],
+        [
+          "graphql.org/learn/caching",
+          "GraphQL usually sends queries as POST requests to a single endpoint, so standard HTTP caching does not apply without extra work such as persisted queries."
+        ],
+        [
+          "graphql.org/learn",
+          "GraphQL lets clients request exactly the fields they need, avoiding over-fetching."
+        ],
+        [
+          "owasp.org/graphql",
+          "OWASP notes that GraphQL APIs need query depth and complexity limits to prevent denial-of-service through expensive nested queries."
+        ],
+        [
+          "postman.com/state-of-api-2023",
+          "In Postman's 2023 State of the API report, 86% of respondents used REST and 29% used GraphQL."
+        ],
+        [
+          "shopify.dev/graphql-rate-limits",
+          "Shopify rate-limits its public GraphQL API by calculated query cost rather than by request count."
+        ]
+      ],
+      "clean": {
+        "content": "For a public API, REST is the safer option. REST GET responses can be cached by browsers and CDNs with standard headers, whereas GraphQL usually sends POST requests to a single endpoint, so standard HTTP caching needs extra work such as persisted queries. REST is also far more widely used (86% of respondents in Postman's 2023 report, against 29% for GraphQL), which lowers the barrier for outside developers. GraphQL's advantage is that clients can request exactly the fields they need, avoiding over-fetching, but a public GraphQL API needs query depth and complexity limits to prevent denial-of-service, and providers such as Shopify rate-limit by query cost. We recommend REST for a public API, and would consider GraphQL where clients' data needs vary widely and the team can invest in cost-based limits.",
+        "claims": [
+          [
+            "REST GET responses can be cached by browsers and CDNs using standard headers.",
+            [
+              1
+            ]
+          ],
+          [
+            "GraphQL usually uses POST to a single endpoint, so standard HTTP caching needs extra work.",
+            [
+              2
+            ]
+          ],
+          [
+            "REST is far more widely used than GraphQL (86% vs 29% in Postman's 2023 report).",
+            [
+              5
+            ]
+          ],
+          [
+            "GraphQL lets clients request exactly the fields they need, avoiding over-fetching.",
+            [
+              3
+            ]
+          ],
+          [
+            "Public GraphQL APIs need query depth and complexity limits to prevent denial-of-service.",
+            [
+              4
+            ]
+          ],
+          [
+            "Shopify rate-limits its public GraphQL API by query cost.",
+            [
+              6
+            ]
+          ]
+        ]
+      },
+      "flaws": {
+        "unsupported": {
+          "content_append": " GraphQL APIs also have twice as many security vulnerabilities as REST APIs.",
+          "add_claim": [
+            "GraphQL APIs have twice as many security vulnerabilities as REST APIs.",
+            [
+              4
+            ]
+          ]
+        },
+        "wrong_citation": {
+          "claim_refs": {
+            "3": [
+              6
+            ]
+          }
+        },
+        "no_recommendation": {
+          "replace": [
+            [
+              "For a public API, REST is the safer option.",
+              "REST and GraphQL each have strengths for a public API."
+            ],
+            [
+              "We recommend REST for a public API, and would consider GraphQL where clients' data needs vary widely and the team can invest in cost-based limits.",
+              "The decision depends on the API's consumers and the team's experience."
+            ]
+          ]
+        },
+        "contradiction": {
+          "replace": [
+            [
+              "whereas GraphQL usually sends POST requests to a single endpoint, so standard HTTP caching needs extra work such as persisted queries",
+              "and GraphQL responses are cached by CDNs just as easily"
+            ],
+            [
+              "GraphQL usually uses POST to a single endpoint, so standard HTTP caching needs extra work.",
+              "GraphQL responses are cached by CDNs as easily as REST GET responses."
+            ]
+          ]
+        },
+        "overclaim": {
+          "replace": [
+            [
+              "GraphQL's advantage is that clients can request exactly the fields they need, avoiding over-fetching",
+              "GraphQL's advantage is that it eliminates every data-fetching problem in any API"
+            ],
+            [
+              "GraphQL lets clients request exactly the fields they need, avoiding over-fetching.",
+              "GraphQL eliminates every data-fetching problem in any API."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "k8s-swarm",
+      "heldout": true,
+      "goal": "Should a small team run Kubernetes or Docker Swarm? Recommend one.",
+      "evidence": [
+        [
+          "cncf.io/survey-2023",
+          "In the CNCF 2023 annual survey, 66% of organisations reported using Kubernetes in production."
+        ],
+        [
+          "docs.docker.com/swarm",
+          "Docker Swarm is built into the Docker Engine and a cluster can be initialised with a single 'docker swarm init' command."
+        ],
+        [
+          "kubernetes.io/docs/concepts",
+          "Kubernetes has a larger set of concepts to learn, including pods, deployments, services and ingress."
+        ],
+        [
+          "mirantis.com/swarm-support-2023",
+          "Mirantis, which maintains Docker Swarm's enterprise distribution, committed in 2023 to supporting Swarm until at least 2030."
+        ],
+        [
+          "aws.amazon.com/eks/pricing",
+          "Amazon EKS charges $0.10 per hour for each Kubernetes cluster control plane."
+        ],
+        [
+          "kubernetes.io/docs/autoscaling",
+          "Kubernetes supports horizontal pod autoscaling based on CPU, memory or custom metrics."
+        ]
+      ],
+      "clean": {
+        "content": "For a small team, Docker Swarm is the simpler place to start. It is built into the Docker Engine and a cluster can be created with a single command, while Kubernetes asks the team to learn a larger set of concepts such as pods, deployments, services and ingress. Kubernetes is far more widely adopted (66% of organisations ran it in production in the CNCF 2023 survey) and supports autoscaling on CPU, memory or custom metrics, which matters as load grows. Swarm's long-term future is less certain, although its enterprise maintainer Mirantis committed in 2023 to support it until at least 2030, and managed Kubernetes adds cost, such as $0.10 per hour per cluster control plane on Amazon EKS. We recommend Swarm for a small team running a few services, and moving to Kubernetes once the team needs autoscaling or the wider ecosystem.",
+        "claims": [
+          [
+            "Docker Swarm is built into the Docker Engine and a cluster can be created with one command.",
+            [
+              2
+            ]
+          ],
+          [
+            "Kubernetes requires learning more concepts, such as pods, deployments, services and ingress.",
+            [
+              3
+            ]
+          ],
+          [
+            "66% of organisations reported using Kubernetes in production in the CNCF 2023 survey.",
+            [
+              1
+            ]
+          ],
+          [
+            "Kubernetes supports autoscaling on CPU, memory or custom metrics.",
+            [
+              6
+            ]
+          ],
+          [
+            "Mirantis committed in 2023 to support Swarm until at least 2030.",
+            [
+              4
+            ]
+          ],
+          [
+            "Amazon EKS charges $0.10 per hour per cluster control plane.",
+            [
+              5
+            ]
+          ]
+        ]
+      },
+      "flaws": {
+        "unsupported": {
+          "content_append": " Swarm clusters also use about 40% less memory than Kubernetes clusters.",
+          "add_claim": [
+            "Swarm clusters use about 40% less memory than Kubernetes clusters.",
+            [
+              2
+            ]
+          ]
+        },
+        "wrong_citation": {
+          "claim_refs": {
+            "2": [
+              6
+            ]
+          }
+        },
+        "no_recommendation": {
+          "replace": [
+            [
+              "For a small team, Docker Swarm is the simpler place to start.",
+              "Docker Swarm and Kubernetes each suit different teams."
+            ],
+            [
+              "We recommend Swarm for a small team running a few services, and moving to Kubernetes once the team needs autoscaling or the wider ecosystem.",
+              "Which fits depends on the team's skills and plans."
+            ]
+          ]
+        },
+        "contradiction": {
+          "replace": [
+            [
+              "although its enterprise maintainer Mirantis committed in 2023 to support it until at least 2030",
+              "and its enterprise maintainer Mirantis announced in 2023 that it would end support"
+            ],
+            [
+              "Mirantis committed in 2023 to support Swarm until at least 2030.",
+              "Mirantis announced in 2023 that it would end Swarm support."
+            ]
+          ]
+        },
+        "overclaim": {
+          "replace": [
+            [
+              "(66% of organisations ran it in production in the CNCF 2023 survey)",
+              "(virtually every organisation runs it in production)"
+            ],
+            [
+              "66% of organisations reported using Kubernetes in production in the CNCF 2023 survey.",
+              "Virtually every organisation runs Kubernetes in production."
+            ]
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -256,6 +256,7 @@ def create_app(
                     # what memory actually held, so a follow-up can show what it drew on
                     "recalled": e.data.get("recalled"),
                     "stored": e.data.get("stored"),
+                    "review": e.data.get("review"),  # what a critic review found, and why
                 })
 
             while True:

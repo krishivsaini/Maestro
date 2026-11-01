@@ -343,6 +343,8 @@
   .thread-note { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 12px 0 0; padding: 9px 12px; font-size: 13px;
     color: var(--text-2); border-left: 3px solid var(--v-memory); background: rgba(166,151,212,.08); border-radius: var(--r-sm); }
   .kv ul { margin: 0; padding-left: 18px; } .kv li { margin: 2px 0; }
+  .kv li b { font-weight: 600; color: var(--ivory); text-transform: capitalize; }
+  .kv .muted { color: var(--muted); }
   /* A follow-up the server refused: off the thread's research. Only ever shown then. */
   .guard-note { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-top: 12px;
     padding: 10px 14px; border-left: 3px solid var(--amber); background: rgba(224,160,76,.08);
@@ -954,6 +956,26 @@ function renderInspector() {
   if (ev.recovery_decision) rows.push(["Decision", esc(cap(ev.recovery_decision))]);
   if (n.kind === "run_started" && run.threadId) rows.push(["Thread", `<code>${esc(run.threadId)}</code>`]);
   if (n.kind === "plan_produced" && plan.size) rows.push(["Subtasks", [...plan.keys()].map((d) => `<code>${esc(d)}</code>`).join(", ")]);
+  // A critic review carries what it found (newer servers): the reasons, not just a verdict.
+  const rv = ev.review || (ev.data && ev.data.review);
+  if (rv) {
+    const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+    const o = rv.open || {};
+    const found = [o.blocker && plural(o.blocker, "blocker"), o.major && plural(o.major, "major issue"),
+      o.minor && plural(o.minor, "minor issue")].filter(Boolean).join(", ");
+    rows.push(["Found", found || "No open issues"]);
+    const cl = rv.claims || {}, names = { supported: "supported", partial: "partly supported",
+      overstated: "overstated", miscited: "miscited", unsupported: "unsupported", contradicted: "contradicted" };
+    const checked = Object.keys(names).filter((k) => cl[k]).map((k) => `${cl[k]} ${names[k]}`).join(", ");
+    if (checked) rows.push(["Claims checked", checked]);
+    if (rv.resolved) rows.push(["Fixed", `${plural(rv.resolved, "earlier issue")} confirmed fixed`]);
+    if (rv.stalled) rows.push(["Stopped", "The revision fixed none of the open issues, so the loop ended here"]);
+    const open = (rv.issues || []).filter((i) => i.status === "open");
+    const order = { blocker: 0, major: 1, minor: 2 };
+    if (open.length) rows.push(["Issues", `<ul>${open.sort((a, b) => order[a.severity] - order[b.severity])
+      .map((i) => `<li><b>${esc(i.severity)}</b> ${esc(i.problem)}${i.origin === "check" ? " <span class=\"muted\">(code check)</span>" : ""}</li>`)
+      .join("")}</ul>`]);
+  }
   // Memory events carry their contents (newer servers), so show what was remembered.
   for (const [key, label] of [["recalled", "Recalled"], ["stored", "Saved"]]) {
     const items = ev[key] || (ev.data && ev.data[key]);

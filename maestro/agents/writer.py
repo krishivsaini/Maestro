@@ -4,6 +4,10 @@ Composes the final cited brief from the PASSED analysis draft and the evidence.
 Its context is the goal, the analysis, and the evidence — not the researchers' or
 critic's internals. When the critic loop hit its ceiling without a PASS, the brief
 is still produced but flagged ``validated=False`` with a note (graceful degrade).
+
+It also sees the critic's last review: claims the critic found unsupported or
+contradicted stay out of the brief, partly supported ones keep their qualifiers, and
+issues left open when the loop ended are stated as caveats rather than buried.
 """
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from ..resilience import OnRetry
-from ..state import AnalysisDraft, Answer, Citation, Evidence, Role, Subtask, SubtaskStatus
+from ..state import AnalysisDraft, Answer, Citation, CriticVerdict, Evidence, Role, Subtask, SubtaskStatus
 from .base import Subagent
 
 WRITER_PROMPT = """You are a Writer subagent in a multi-agent research system.
@@ -30,6 +34,12 @@ Compose the FINAL cited brief from the analysis draft and the evidence.
 - Cite sources by their identifiers where claims rest on them.
 - Do not introduce claims that the analysis/evidence does not support. If the
   evidence is thin on a dimension, say so rather than padding.
+- A reviewer has checked each claim against its evidence. Leave out claims marked
+  UNSUPPORTED or CONTRADICTED. For a claim marked MISCITED, cite the evidence that
+  actually states it, never the one the analysis gave. State claims marked OVERSTATED
+  as the evidence states them, with its qualifiers. State claims marked PARTIAL only as strongly as the
+  evidence allows. If open issues are listed, the analysis was not fully validated:
+  say so plainly in the brief and state those limitations as caveats.
 Return the final brief text and the list of citations used."""
 
 
@@ -102,15 +112,23 @@ class Writer(Subagent):
         evidence: list[Evidence],
         *,
         validated: bool = True,
+        review: Optional[CriticVerdict] = None,
         on_retry: Optional[OnRetry] = None,
     ) -> tuple[Subtask, Answer]:
-        claims = "\n".join(f"- {c}" for c in draft.claims) or "(none listed)"
+        marks = {c.claim: c.verdict.upper() for c in (review.claim_checks if review else [])}
+        claims = "\n".join(
+            f"- C{i}. {c}" + (f"  [reviewer: {marks[i]}]" if i in marks else "")
+            for i, c in enumerate(draft.claims, start=1)) or "(none listed)"
         human = (
             f"Goal: {goal}\n\n"
             f"Analysis to write up:\n{draft.content}\n\n"
             f"Claims:\n{claims}\n\n"
             f"Evidence (cite by id/source):\n{_render_evidence(evidence)}"
         )
+        open_issues = review.open_issues("blocker", "major") if review and not validated else []
+        if open_issues:
+            human += "\n\nOpen issues the analysis did not resolve (state these as caveats):\n" + \
+                "\n".join(f"- {i.problem}" for i in open_issues)
         out = self._structured(WriterOutput, human, on_retry=on_retry)
         notes = None if validated else (
             "Critic ceiling reached without a PASS; brief proceeds but is not fully validated."

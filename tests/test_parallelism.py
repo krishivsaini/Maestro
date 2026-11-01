@@ -148,9 +148,9 @@ def _graph_agents(researcher, make_stub, max_parallel):
         name = getattr(schema, "__name__", "")
         if name == "AnalysisModel":
             timings["analyst_start"] = time.perf_counter()
-            return AnalysisModel(content="analysis", claims=["c1"])
+            return AnalysisModel(content="analysis", claims=["c1 [1]"])
         if name == "CriticOutput":
-            return CriticOutput(decision=CriticDecision.passed, feedback="")
+            return CriticOutput.scripted(CriticDecision.passed, "", messages)
         if name == "WriterOutput":
             return WriterOutput(content="brief", citations=["s"])
         raise AssertionError(name)

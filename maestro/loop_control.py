@@ -25,12 +25,16 @@ def step_ceiling_reached(state: dict, settings: Settings) -> bool:
 
 
 def stuck_in_critic_loop(state: dict, threshold: int = CRITIC_STALL_THRESHOLD) -> bool:
-    """True if the last ``threshold`` critic verdicts are identical REJECTs.
+    """True if the loop is not converging: the last review found that a revision fixed
+    none of the open issues, or the last ``threshold`` REJECTs gave identical feedback.
 
     Identical feedback repeated means the analyst is not making progress and the
     loop would spin uselessly to the ceiling — force completion instead.
     """
-    rejects = [v for v in state.get("critic_verdicts", []) if v.decision == CriticDecision.rejected]
+    verdicts = state.get("critic_verdicts", [])
+    if verdicts and getattr(verdicts[-1], "stalled", False):
+        return True  # a revision fixed none of the open issues (see Critic.run)
+    rejects = [v for v in verdicts if v.decision == CriticDecision.rejected]
     if len(rejects) < threshold:
         return False
     recent = rejects[-threshold:]

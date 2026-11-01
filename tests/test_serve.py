@@ -6,6 +6,7 @@ as SSE, the run is persisted, and it's reconstructable via /runs and /runs/{id}.
 """
 
 import json
+import re
 
 from fastapi.testclient import TestClient
 
@@ -32,13 +33,15 @@ def build_stub_agents(make_stub, critic_decisions):
     def responder(schema, messages):
         name = getattr(schema, "__name__", "")
         if name == "ResearchFindings":
-            return ResearchFindings(findings=[ResearchFinding(source="src_solar", content="solar peaks midday")])
+            # cite a source from the results actually shown, as the grounding check requires
+            src = re.search(r"source=(\S+)", messages[-1][1]).group(1)
+            return ResearchFindings(findings=[ResearchFinding(source=src, content=f"{src} finding")])
         if name == "AnalysisModel":
-            return AnalysisModel(content="analysis", claims=["c1", "c2"])
+            return AnalysisModel(content="analysis", claims=["c1 [1]", "c2 [1]"])
         if name == "CriticOutput":
             d = critic_decisions[min(counter["i"], len(critic_decisions) - 1)]
             counter["i"] += 1
-            return CriticOutput(decision=d, feedback="" if d == CriticDecision.passed else "fix c2")
+            return CriticOutput.scripted(d, "" if d == CriticDecision.passed else "fix c2", messages)
         if name == "WriterOutput":
             return WriterOutput(content="FINAL BRIEF", citations=["src_solar"])
         raise AssertionError(name)
@@ -124,8 +127,8 @@ def test_follow_up_recalls_memory_after_a_restart(make_stub, tmp_path):
         def wrapped(schema, messages):
             if getattr(schema, "__name__", "") == "AnalysisModel":
                 return AnalysisModel(content="analysis", claims=[
-                    "wind has the higher capacity factor for the grid",
-                    "solar output peaks midday and needs storage"])
+                    "wind has the higher capacity factor for the grid [1]",
+                    "solar output peaks midday and needs storage [1]"])
             return responder(schema, messages)
         return make_stub(wrapped)
 

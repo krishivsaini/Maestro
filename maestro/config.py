@@ -72,6 +72,14 @@ class Settings(BaseSettings):
     # --- Loop / cost ceilings ---
     max_steps: int = 40  # global backstop: total node executions per run
     max_critic_iters: int = 3
+    # The critic reviews at temperature 0, so the same draft gets the same verdict.
+    # critic_model_id can point it at a different model from the one that wrote the
+    # draft; empty = the run's own model. Empty is the default because, on the
+    # seeded-flaw evaluation (scripts/critic_eval.py), the lite model caught 20/20
+    # planted flaws against 19/20 for gemini-3.6-flash, at ~2s a review against 5-40s.
+    critic_model_id: str = ""
+    critic_temperature: float = 0.0
+    critic_major_limit: int = 2  # this many open major issues send a draft back
     max_recovery_attempts: int = 2
 
     # --- Follow-ups ---

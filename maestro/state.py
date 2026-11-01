@@ -110,6 +110,36 @@ class AnalysisDraft(BaseModel):
     content: str
     claims: list[str] = Field(default_factory=list)
     revision: int = 0
+    # refs[i] are the evidence numbers (1-based, as the evidence is shown to every
+    # agent) that claims[i] rests on. Kept parallel to ``claims`` so drafts written
+    # before claims carried citations still load.
+    refs: list[list[int]] = Field(default_factory=list)
+    addressed: list[str] = Field(default_factory=list)  # "#3: what changed", on a revision
+
+
+class ReviewIssue(BaseModel):
+    """One problem the critic (or the checks run before it) found in a draft.
+
+    ``id`` is stable across reviews, so a revision can say which issues it fixed and
+    the next review can confirm it. Severity decides the verdict, not the model:
+    any open blocker, or too many open majors, sends the draft back; minors never do.
+    """
+
+    id: int
+    severity: str          # "blocker" | "major" | "minor"
+    criterion: str         # "grounding" | "coverage" | "reasoning" | "calibration" | "consistency"
+    problem: str
+    fix: str = ""
+    origin: str = "critic"  # "check" (deterministic, before the model) | "critic"
+    status: str = "open"    # "open" | "resolved"
+
+
+class ClaimCheck(BaseModel):
+    """The critic's reading of one claim against the evidence it cites."""
+
+    claim: int             # 1-based, as the claims were numbered for the critic
+    verdict: str           # "supported" | "partial" | "overstated" | "unsupported" | "contradicted" | "miscited"
+    note: str = ""
 
 
 class CriticVerdict(BaseModel):
@@ -119,6 +149,15 @@ class CriticVerdict(BaseModel):
     feedback: str = ""
     iteration: int = 0
     created_at: str = Field(default_factory=_utcnow)
+    issues: list[ReviewIssue] = Field(default_factory=list)
+    claim_checks: list[ClaimCheck] = Field(default_factory=list)
+    # True when a re-review finds that a revision fixed none of the open issues: the
+    # loop is not converging, so it stops rather than spending more calls.
+    stalled: bool = False
+
+    def open_issues(self, *severities: str) -> list[ReviewIssue]:
+        sev = severities or ("blocker", "major", "minor")
+        return [i for i in self.issues if i.status == "open" and i.severity in sev]
 
 
 class Citation(BaseModel):

@@ -43,10 +43,10 @@ def turn1_responder(schema, messages):
     if name == "AnalysisModel":
         return AnalysisModel(
             content="solar analysis",
-            claims=[f"solar power {UNIQUE} capacity factor around 25 percent", "storage matters"],
+            claims=[f"solar power {UNIQUE} capacity factor around 25 percent [1]", "storage matters [1]"],
         )
     if name == "CriticOutput":
-        return CriticOutput(decision=CriticDecision.passed, feedback="")
+        return CriticOutput.scripted(CriticDecision.passed, "", messages)
     if name == "WriterOutput":
         return WriterOutput(content="brief", citations=["s"])
     raise AssertionError(name)
@@ -70,9 +70,9 @@ def test_two_turn_memory_written_then_used(make_stub):
         name = getattr(schema, "__name__", "")
         if name == "AnalysisModel":
             captured["human"] = messages[-1][1]  # what the analyst actually saw
-            return AnalysisModel(content="analysis2", claims=["c"])
+            return AnalysisModel(content="analysis2", claims=["c [1]"])
         if name == "CriticOutput":
-            return CriticOutput(decision=CriticDecision.passed, feedback="")
+            return CriticOutput.scripted(CriticDecision.passed, "", messages)
         if name == "WriterOutput":
             return WriterOutput(content="brief2", citations=["s"])
         raise AssertionError(name)
