@@ -42,6 +42,12 @@ services:
 
       # Gemini free tier is ~10 RPM on the primary model, and a multi-agent run
       # multiplies calls, so keep the parallel burst small (see maestro/config.py).
+      # Durable runs and memory: a Postgres URL from a free Neon or Supabase project.
+      # Without it, past runs and thread memory reset on every restart and deploy.
+      - key: DATABASE_URL
+        sync: false
+      - key: MAESTRO_TRUST_PROXY   # Render's proxy sets X-Forwarded-For
+        value: "true"
       - key: MAESTRO_MAX_PARALLEL
         value: "2"
 

@@ -420,7 +420,7 @@
   <section class="ask" aria-label="Start a run">
     <label class="ask-label" for="goal">What should the agents research?</label>
     <div class="ask-row">
-      <input id="goal" type="text" autocomplete="off" placeholder="Compare X and Y for Z, and recommend one." />
+      <input id="goal" type="text" autocomplete="off" maxlength="500" placeholder="Compare X and Y for Z, and recommend one." />
       <button class="primary" id="run" type="button">Run agents</button>
     </div>
     <div class="examples" id="examples"><span class="try">Try</span></div>
@@ -554,7 +554,7 @@
     <div class="fu" id="fu" hidden>
       <label class="fu-label" for="fu-in">Ask a follow-up</label>
       <div class="ask-row">
-        <input id="fu-in" type="text" autocomplete="off" placeholder="What would change this recommendation?" />
+        <input id="fu-in" type="text" autocomplete="off" maxlength="500" placeholder="What would change this recommendation?" />
         <button class="primary" id="fu-run" type="button">Ask</button>
       </div>
       <div class="examples" id="fu-suggest"><span class="try">Try</span></div>
@@ -1353,11 +1353,19 @@ async function conduct(opts = {}) {
     startView({ mode: "live", goal, threadId: thread_id });
     $("runbar").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   };
-  if (thread_id) { if (where === "fu") $("fu-run").textContent = "Checking…"; else $("run").textContent = "Checking…"; }
-  else begin();                                   // a new thread is never checked
+  // The server may also refuse the run outright (a usage limit, an invalid question), so
+  // every run waits for its first answer before the page changes.
+  if (where === "fu") $("fu-run").textContent = "Checking…"; else $("run").textContent = thread_id ? "Checking…" : "Starting…";
   try {
     const resp = await fetch(api("/run"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goal, thread_id, model: currentModel, api_key }) });
+    if (resp.status === 429 || resp.status === 422) {
+      const body = await resp.json().catch(() => ({}));
+      blocked = true;
+      showNote(where, body.error || `The server refused the run (HTTP ${resp.status}).`,
+        resp.status === 429 && !api_key ? { label: "Add your own key", run: () => showKey() } : null);
+      return;
+    }
     if (!resp.ok || !resp.body) throw new Error("HTTP " + resp.status);
     const reader = resp.body.getReader(), dec = new TextDecoder();
     let buf = "";
@@ -1499,11 +1507,19 @@ async function prepareThreadCopy(t, runs) {
 // The server refused a follow-up as outside its thread's research. Say why, and offer
 // to ask it as a new question, which starts a fresh thread with no memory attached.
 let refused = "";
-function showBlocked(ev, where) {
-  refused = ev.question || "";
-  $(where + "-block-text").textContent = ev.reason || "That's outside this thread's research.";
+// A note under the box the visitor typed in: why the run didn't start, and what to do.
+function showNote(where, text, action) {
+  $(where + "-block-text").textContent = text;
+  const b = $(where === "fu" ? "fu-new" : "ask-new");
+  b.hidden = !action;
+  if (action) { b.textContent = action.label; b.onclick = action.run; }
   $(where + "-block").hidden = false;
   $(where === "fu" ? "fu-in" : "goal").focus();
+}
+function showBlocked(ev, where) {
+  refused = ev.question || "";
+  showNote(where, ev.reason || "That's outside this thread's research.",
+    { label: "Start it as a new question", run: startAsNew });
 }
 function hideBlocks() { $("fu-block").hidden = $("ask-block").hidden = true; }
 function startAsNew() {
@@ -1662,7 +1678,6 @@ $("followup").onclick = () => {
   $("fu-in").focus({ preventScroll: true });
 };
 $("fu-run").onclick = askFollowUp;
-$("fu-new").onclick = $("ask-new").onclick = startAsNew;
 $("fu-in").addEventListener("input", () => { $("fu-block").hidden = true; });
 $("goal").addEventListener("input", () => { $("ask-block").hidden = true; });
 $("fu-in").addEventListener("keydown", (e) => { if (e.key === "Enter") askFollowUp(); });

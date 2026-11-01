@@ -150,7 +150,7 @@ git clone https://github.com/krishivsaini/Maestro.git
 cd Maestro
 uv sync                       # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 137 passed, 1 skipped
+# run the full test suite (offline, no API key) — 153 passed, 7 skipped
 uv run pytest
 
 # see the coordination in the browser
@@ -210,7 +210,7 @@ deployed backend without editing anything.
 None of this is required — FastAPI still serves the viewer at `/`, so the single container remains
 self-contained.
 
-The image is **133MB** because it omits the `embeddings` extra — `sentence-transformers` pulls torch
+The image is **about 130MB compressed** (about 600MB unpacked) because it omits the `embeddings` extra — `sentence-transformers` pulls torch
 (~670MB installed), and long-term memory defaults to `HashingEmbedder`, so the deployed service never
 needs it. Install it locally with `uv sync --extra embeddings` if you want real semantic embeddings.
 
@@ -223,8 +223,32 @@ What the free tier costs you, concretely:
 |---|---|
 | **512MB RAM / 0.1 CPU** | A measured run peaks at ~187MB, so memory is fine; the thin CPU slows cold start, not runs (the work is I/O-bound on Gemini). |
 | **15-min idle spin-down** | The first visitor after a quiet spell waits ~1 min for the container to wake. Health checks don't keep it up. |
-| **Ephemeral disk** | The trace DB and memory store live in `/tmp` and reset on every restart and deploy — past runs aren't durable. Attach a persistent disk (paid) to keep them. |
-| **Shared quota** | The server key is the free Gemini tier (~1500 req/day) shared by every visitor. The viewer's bring-your-own-key field overrides it per-request — the key is used transiently and never stored or logged. |
+| **Ephemeral disk** | Without a database, past runs and thread memory live in `/tmp` and reset on every restart and deploy. Set `DATABASE_URL` (below) and both are stored in Postgres instead. |
+| **Shared quota** | The server key is the free Gemini tier shared by every visitor, so runs are limited before any model call: 6 per visitor per hour and 60 per day on the shared key (`MAESTRO_RUN_LIMIT_PER_IP`, `MAESTRO_SHARED_DAILY_RUNS`). A visitor can add their own key in the viewer: it is used for that run only, never stored or logged, and their runs don't count toward the daily cap. |
+
+### Keeping runs and memory across restarts
+
+Create a free Postgres database (for example a [Neon](https://neon.tech) project; Supabase works too),
+copy its connection string, and set it as `DATABASE_URL` in the Render dashboard. On Supabase, use the
+**Session pooler** (or Transaction pooler) string from *Connect*, not the direct connection: the direct
+one is IPv6-only on the free plan and Render can't reach it. `GET /healthz` reports which storage is live
+(`"storage": "postgres"`), so a deploy can be checked without reading its logs; if the database can't be
+reached, the service falls back to local storage and says so there instead of failing to start. Maestro creates its
+tables on first start and stores runs and thread memory there; with no `DATABASE_URL` it uses SQLite
+and files as before. Recall needs no vector extension (a thread holds a handful of findings, ranked in
+Python), so any Postgres works.
+
+### Safety on a public demo
+
+- **Usage limits** as above, per visitor IP (behind Render's proxy, from `X-Forwarded-For`; set
+  `MAESTRO_TRUST_PROXY=true` only behind a proxy, since anyone can send that header).
+- **Validated input**: questions up to 500 characters, thread ids and keys checked, with messages a
+  visitor can act on.
+- **Web text is data**: researchers read third-party pages, so sentences addressing an AI ("ignore
+  previous instructions…") are removed before a researcher sees them, the pages are marked as
+  untrusted in its prompt, a finding that still carries instructions is dropped, and every agent that
+  handles evidence treats it as data, not instructions.
+- **Off-topic follow-ups** are refused before any agent runs (see the follow-up guardrail).
 
 ---
 
@@ -248,7 +272,7 @@ What the free tier costs you, concretely:
 
 ## Tests
 
-`uv run pytest` → **137 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
+`uv run pytest` → **153 passed, 7 skipped**, offline (LLM stubbed, no key/quota); the 5 Postgres variants of the storage tests run when `MAESTRO_TEST_DATABASE_URL` is set, as in CI. The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
 exceeded, dependents wait), `test_critic_loop`, `test_critic_review`, `test_recovery`, `test_loop_control`,
 plus memory, trace-replay, service, guardrail and writer-citation tests.

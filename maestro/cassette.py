@@ -35,7 +35,7 @@ from typing import Any, Optional
 FORMAT = 2  # 2: page text recorded alongside searches
 
 # Settings that change behaviour. Secrets, paths and server options are not recorded.
-_NOT_RECORDED = re.compile(r"key|path|dir|host|port|cors|provider_base|base_url")
+_NOT_RECORDED = re.compile(r"key|path|dir|host|port|cors|url|database")  # a database URL holds a password
 
 
 class ReplayMiss(BaseException):

@@ -12,12 +12,12 @@ Kept decoupled from the graph: the service/CLI calls ``save_run(final_state)``.
 from __future__ import annotations
 
 import json
-import sqlite3
 from datetime import datetime, timezone
 from typing import Iterator, Optional
 
 from pydantic import BaseModel
 
+from .db import Database
 from .logging_config import get_logger
 from .state import Answer, Subtask, TraceEvent
 
@@ -63,16 +63,19 @@ def record_from_state(state: dict) -> RunRecord:
 
 
 class TraceStore:
-    """SQLite-backed store of runs + their events (both for full-fidelity replay
-    and queryable audit)."""
+    """Runs + their events (both for full-fidelity replay and queryable audit), in
+    SQLite locally or Postgres when given a ``postgres://`` URL (see maestro/db.py)."""
 
-    def __init__(self, db_path: str = ":memory:") -> None:
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
+    def __init__(self, db: "str | Database" = ":memory:") -> None:
+        self.db = db if isinstance(db, Database) else Database(db)
         self._init_schema()
 
+    @property
+    def conn(self):  # kept for callers that reached for the raw connection
+        return self.db.conn
+
     def _init_schema(self) -> None:
-        self.conn.executescript(
+        self.db.script(
             """
             CREATE TABLE IF NOT EXISTS runs (
                 run_id TEXT PRIMARY KEY,
@@ -93,44 +96,37 @@ class TraceStore:
                 subtask_id TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id);
-            CREATE INDEX IF NOT EXISTS idx_runs_thread ON runs(thread_id);
+            CREATE INDEX IF NOT EXISTS idx_runs_thread ON runs(thread_id)
             """
         )
-        self.conn.commit()
 
     def save_run(self, state: dict) -> str:
         """Persist a completed run's full state + events. Returns the run id."""
         rec = record_from_state(state)
-        self.conn.execute(
-            "INSERT OR REPLACE INTO runs (run_id, thread_id, goal, status, created_at, event_count, payload) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (rec.run_id, rec.thread_id, rec.goal, rec.status, rec.created_at, len(rec.events), rec.model_dump_json()),
-        )
-        self.conn.execute("DELETE FROM events WHERE run_id = ?", (rec.run_id,))
-        self.conn.executemany(
-            "INSERT INTO events (run_id, seq, event_type, agent, timestamp, summary, subtask_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [
-                (rec.run_id, i, e.event_type.value, e.agent, e.timestamp, e.summary, e.subtask_id)
-                for i, e in enumerate(rec.events)
-            ],
-        )
-        self.conn.commit()
+        with self.db.transaction():
+            self.db.upsert("runs", "run_id", {
+                "run_id": rec.run_id, "thread_id": rec.thread_id, "goal": rec.goal, "status": rec.status,
+                "created_at": rec.created_at, "event_count": len(rec.events), "payload": rec.model_dump_json()})
+            self.db.execute("DELETE FROM events WHERE run_id = ?", (rec.run_id,))
+            self.db.executemany(
+                "INSERT INTO events (run_id, seq, event_type, agent, timestamp, summary, subtask_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [(rec.run_id, i, e.event_type.value, e.agent, e.timestamp, e.summary, e.subtask_id)
+                 for i, e in enumerate(rec.events)],
+            )
         log.info("persisted run %s (%d events, status=%s)", rec.run_id, len(rec.events), rec.status)
         return rec.run_id
 
     def get_run(self, run_id: str) -> Optional[RunRecord]:
-        row = self.conn.execute("SELECT payload FROM runs WHERE run_id = ?", (run_id,)).fetchone()
-        return RunRecord.model_validate_json(row["payload"]) if row else None
+        rows = self.db.query("SELECT payload FROM runs WHERE run_id = ?", (run_id,))
+        return RunRecord.model_validate_json(rows[0]["payload"]) if rows else None
 
     def list_runs(self, thread_id: Optional[str] = None) -> list[dict]:
         """Newest first; a thread's runs come back oldest first, in conversation order."""
         cols = "SELECT run_id, thread_id, goal, status, created_at, event_count FROM runs"
         if thread_id is not None:
-            rows = self.conn.execute(f"{cols} WHERE thread_id = ? ORDER BY created_at ASC", (thread_id,)).fetchall()
-        else:
-            rows = self.conn.execute(f"{cols} ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+            return self.db.query(f"{cols} WHERE thread_id = ? ORDER BY created_at ASC", (thread_id,))
+        return self.db.query(f"{cols} ORDER BY created_at DESC")
 
     def replay(self, run_id: str) -> Iterator[TraceEvent]:
         """Yield the run's events in order — the node-by-node replay."""
@@ -147,8 +143,7 @@ class TraceStore:
             clauses.append("event_type = ?")
             params.append(event_type)
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-        rows = self.conn.execute(f"SELECT * FROM events{where} ORDER BY run_id, seq", params).fetchall()
-        return [dict(r) for r in rows]
+        return self.db.query(f"SELECT * FROM events{where} ORDER BY run_id, seq", params)
 
     def export_json(self, run_id: str) -> Optional[dict]:
         rec = self.get_run(run_id)
@@ -162,4 +157,4 @@ class TraceStore:
             json.dump(data, f, indent=2)
 
     def close(self) -> None:
-        self.conn.close()
+        self.db.close()

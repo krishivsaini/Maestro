@@ -25,6 +25,8 @@ dependencies = [
     # deployed service never needs it. See the `embeddings` extra below.
     "faiss-cpu>=1.8.0",
     "numpy>=1.26.0",
+    # --- durable storage (optional at runtime: used when DATABASE_URL is set) ---
+    "psycopg[binary]>=3.2.0",
     # --- service ---
     "fastapi>=0.111.0",
     "uvicorn[standard]>=0.30.0",

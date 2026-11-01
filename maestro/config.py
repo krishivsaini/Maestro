@@ -43,6 +43,9 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         protected_namespaces=(),  # allow field names starting with `model_`
+        # Fields with alternative env names (PORT, DATABASE_URL) also accept their own
+        # name in code: without this, Settings(database_url=...) is silently ignored.
+        populate_by_name=True,
     )
 
     # --- Provider / model (verify live before demo; see module docstring) ---
@@ -94,6 +97,15 @@ class Settings(BaseSettings):
     max_research_requests: int = 2
     max_recovery_attempts: int = 2
 
+    # --- Public demo limits (see maestro/limits.py); 0 turns a limit off ---
+    run_limit_per_ip: int = 6            # runs per visitor per window, on the shared key
+    run_limit_window_minutes: int = 60
+    byok_limit_multiplier: int = 5       # runs on a visitor's own key spend their quota
+    shared_daily_runs: int = 60          # runs per UTC day on the shared key, all visitors
+    # Behind a proxy (Render), the visitor's IP is the first X-Forwarded-For hop. Only
+    # trust it when there is one: anyone can send that header to a server reached directly.
+    trust_proxy: bool = False
+
     # --- Follow-ups ---
     # Check that a follow-up is about its thread's research before any agent runs
     # (see maestro/guard.py). MAESTRO_FOLLOWUP_GUARD=false turns it off.
@@ -141,6 +153,9 @@ class Settings(BaseSettings):
     # PaaS hosts (Render, Cloud Run, Fly) inject a bare ``PORT`` and expect the process
     # to bind exactly it, so accept that name alongside the prefixed ``MAESTRO_PORT``.
     port: int = Field(default=8000, validation_alias=AliasChoices("MAESTRO_PORT", "PORT"))
+    # A Postgres URL (e.g. a free Neon or Supabase database) makes past runs and thread
+    # memory durable across restarts; empty = SQLite and files (see maestro/db.py).
+    database_url: str = Field(default="", validation_alias=AliasChoices("MAESTRO_DATABASE_URL", "DATABASE_URL"))
 
 
     def cors_origin_list(self) -> list[str]:

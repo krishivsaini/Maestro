@@ -1,8 +1,8 @@
 name: tests
 
 # Every push and pull request runs the whole suite offline: stubbed models, plus the
-# recorded runs in data/cassettes replayed through the current code. No API key, no
-# quota, no network beyond installing dependencies.
+# recorded runs in data/cassettes replayed through the current code, with storage tested
+# on SQLite and on a Postgres service. No API key, no quota.
 on:
   push:
   pull_request:
@@ -11,6 +11,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # A real Postgres, so durable storage (maestro/db.py) is tested on both databases.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maestro_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MAESTRO_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/maestro_test
     steps:
       - uses: actions/checkout@v7
 

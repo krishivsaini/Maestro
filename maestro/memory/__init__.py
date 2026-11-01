@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .longterm import Embedder, HashingEmbedder, LongTermMemory, SentenceTransformerEmbedder
+from .sql import SqlMemory
 from .working import distill_findings
 
 __all__ = [
@@ -10,5 +11,6 @@ __all__ = [
     "Embedder",
     "HashingEmbedder",
     "SentenceTransformerEmbedder",
+    "SqlMemory",
     "distill_findings",
 ]

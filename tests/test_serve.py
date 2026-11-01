@@ -72,7 +72,7 @@ def _parse_sse(text: str) -> list[dict]:
 def test_healthz(make_stub):
     client = make_client(make_stub, [CriticDecision.passed], TraceStore(":memory:"))
     r = client.get("/healthz")
-    assert r.status_code == 200 and r.json() == {"status": "ok"}
+    assert r.status_code == 200 and r.json()["status"] == "ok"
 
 
 def test_viewer_served_at_root(make_stub):

@@ -17,16 +17,19 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from .config import get_settings
 from .graph import MaestroAgents, build_default_agents, build_graph
 from .guard import FollowUpGuard, ThreadContext, split_follow_up
+from .limits import RunLimits
 from .logging_config import get_logger
-from .memory import HashingEmbedder, LongTermMemory
+from .db import Database
+from .memory import HashingEmbedder, LongTermMemory, SqlMemory
 from .resilience import is_rate_limit_error
 from .state import _utcnow, new_state
 from .trace import TraceStore
@@ -36,11 +39,36 @@ log = get_logger("serve")
 VIEWER_PATH = Path(__file__).resolve().parent.parent / "viewer" / "index.html"
 
 
+MAX_GOAL_CHARS = 500
+
+
 class RunRequest(BaseModel):
-    goal: str
-    thread_id: Optional[str] = None
-    model: Optional[str] = None  # None -> server default; else the primary/fallback model id
-    api_key: Optional[str] = None  # bring-your-own-key: used transiently, never stored/logged
+    goal: str = Field(min_length=3, max_length=MAX_GOAL_CHARS + 200)  # a follow-up carries its opening question
+    thread_id: Optional[str] = Field(None, pattern=r"^[A-Za-z0-9_.:-]{1,64}$")
+    model: Optional[str] = Field(None, max_length=80)  # None -> server default; else the primary/fallback model id
+    api_key: Optional[str] = Field(None, max_length=200)  # bring-your-own-key: used transiently, never stored/logged
+
+    @field_validator("goal")
+    @classmethod
+    def _goal(cls, v: str) -> str:
+        v = " ".join(v.split())
+        from .guard import split_follow_up
+
+        asked = split_follow_up(v)[1]
+        if len(asked) > MAX_GOAL_CHARS:
+            raise ValueError(f"a question can be at most {MAX_GOAL_CHARS} characters")
+        if len(asked) < 3:
+            raise ValueError("ask a question of at least a few words")
+        return v
+
+
+# What the visitor sees when a request is invalid, by field.
+FIELD_ERRORS = {
+    "goal": f"Questions can be up to {MAX_GOAL_CHARS} characters. Shorten it and try again.",
+    "thread_id": "That thread id isn't valid: use letters, numbers, - and _, up to 64 characters.",
+    "model": "That model isn't available.",
+    "api_key": "That doesn't look like a Gemini API key.",
+}
 
 
 def _sse(payload: dict) -> str:
@@ -86,13 +114,28 @@ def create_app(
     if agents is None:
         agents = build_default_agents(settings)
     mem_dir = memory_dir if memory_dir is not None else (None if injected else settings.memory_store_dir)
+    # With a database URL, runs and memory share one durable database; otherwise SQLite
+    # for runs and files for memory, which a free host's disk wipe loses on restart.
+    db, storage = None, "sqlite"
+    if settings.database_url and trace_store is None:
+        try:
+            db = Database(settings.database_url)
+            storage = db.dialect
+            log.info("storing runs and memory in %s", db.dialect)
+        except Exception as exc:  # a bad URL or unreachable host must not take the demo down
+            storage = "sqlite (database unreachable)"
+            log.error("DATABASE_URL is set but the database can't be reached (%s: %s); falling back to "
+                      "local storage, which a restart wipes", type(exc).__name__, str(exc).split("\n")[0][:200])
     # attach thread-scoped long-term memory (HashingEmbedder default -> no torch)
     if memory is not None:
         agents.memory = memory
     elif agents.memory is None:
-        agents.memory = (LongTermMemory.load(mem_dir, embedder=HashingEmbedder()) if mem_dir
-                         else LongTermMemory(embedder=HashingEmbedder()))
-    store = trace_store if trace_store is not None else TraceStore(settings.trace_db_path)
+        if db is not None:
+            agents.memory, mem_dir = SqlMemory(db), None
+        else:
+            agents.memory = (LongTermMemory.load(mem_dir, embedder=HashingEmbedder()) if mem_dir
+                             else LongTermMemory(embedder=HashingEmbedder()))
+    store = trace_store if trace_store is not None else TraceStore(db or settings.trace_db_path)
     mem_lock = threading.Lock()
 
     def persist_memory() -> None:
@@ -147,7 +190,22 @@ def create_app(
         cfg = settings.model_copy(update={"google_api_key": api_key}) if api_key else settings
         return FollowUpGuard(cfg, classifier=followup_classifier, enabled=settings.followup_guard)
 
+    limits = RunLimits(settings)
+
+    def client_ip(request: Request) -> str:
+        fwd = request.headers.get("x-forwarded-for")
+        if settings.trust_proxy and fwd:
+            return fwd.split(",")[0].strip()
+        return request.client.host if request.client else "unknown"
+
     app = FastAPI(title="Maestro", version="0.1.0")
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
+        fields = [str(e["loc"][-1]) for e in exc.errors() if e.get("loc")]
+        field = next((f for f in fields if f in FIELD_ERRORS), None)
+        return JSONResponse({"error": FIELD_ERRORS.get(field, "That request isn't valid."), "field": field},
+                            status_code=422)
 
     # Only enabled when the viewer is hosted on a separate origin (see
     # Settings.cors_origins). Same-origin — FastAPI serving the viewer at "/" —
@@ -189,10 +247,18 @@ def create_app(
 
     @app.get("/healthz")
     def healthz() -> dict:
-        return {"status": "ok"}
+        # which storage is live, so a deploy can be checked without reading its logs
+        return {"status": "ok", "storage": storage}
 
     @app.post("/run")
-    def run(req: RunRequest) -> StreamingResponse:
+    def run(req: RunRequest, request: Request) -> Response:
+        # Refused before any model call: one visitor can't spend the shared quota.
+        refusal = limits.check(client_ip(request), own_key=bool(req.api_key))
+        if refusal:
+            log.info("run refused (%s limit) for %s", refusal.reason, client_ip(request))
+            return JSONResponse({"error": refusal.message, "reason": refusal.reason,
+                                 "retry_after": refusal.retry_after},
+                                status_code=429, headers={"Retry-After": str(refusal.retry_after)})
         state = new_state(req.goal, thread_id=req.thread_id)
         run_id, thread_id = state["run_id"], state["thread_id"]
         # NB: never log req.api_key — only the goal, thread and model id are logged.
