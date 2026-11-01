@@ -153,6 +153,39 @@ def test_follow_up_recalls_memory_after_a_restart(make_stub, tmp_path):
     assert restarted.get("/threads/nobody").json() == {"thread_id": "nobody", "runs": [], "memory_findings": 0}
 
 
+def test_off_topic_follow_up_is_blocked_before_any_agent_runs(make_stub):
+    from maestro.guard import Relevance
+
+    seen = []
+
+    def classifier(question, ctx):
+        seen.append((question, ctx.question))
+        return Relevance(on_topic="patent" not in question, reason="That's not about solar vs wind.")
+
+    store = TraceStore(":memory:")
+    agents = build_stub_agents(make_stub, [CriticDecision.passed])
+    client = TestClient(create_app(agents=agents, trace_store=store, followup_classifier=classifier))
+
+    # a new thread is never checked
+    first = _parse_sse(client.post("/run", json={"goal": "Compare solar and wind", "thread_id": "t1"}).text)
+    assert first[-1]["status"] == "completed" and seen == []
+
+    # off topic: one blocked frame, no run, nothing saved
+    goal = 'Follow-up to "Compare solar and wind": how do I file a patent?'
+    frames = _parse_sse(client.post("/run", json={"goal": goal, "thread_id": "t1"}).text)
+    assert [f["type"] for f in frames] == ["blocked"]
+    assert frames[0]["reason"] == "That's not about solar vs wind."
+    assert frames[0]["question"] == "how do I file a patent?"
+    assert seen[-1] == ("how do I file a patent?", "Compare solar and wind")  # only the asked part is judged
+    assert len(client.get("/threads/t1").json()["runs"]) == 1
+
+    # on topic: runs as normal
+    goal = 'Follow-up to "Compare solar and wind": what would change this recommendation?'
+    frames = _parse_sse(client.post("/run", json={"goal": goal, "thread_id": "t1"}).text)
+    assert frames[0]["type"] == "run_started" and frames[-1]["status"] == "completed"
+    assert len(client.get("/threads/t1").json()["runs"]) == 2
+
+
 def test_models_endpoint_and_stub_ignores_switch(make_stub):
     client = make_client(make_stub, [CriticDecision.passed], TraceStore(":memory:"))
     m = client.get("/models").json()

@@ -126,6 +126,10 @@ class LongTermMemory:
         """How many findings this thread has stored — what a follow-up can draw on."""
         return sum(1 for m in self.meta if m["thread_id"] == thread_id)
 
+    def findings(self, thread_id: str) -> list[str]:
+        """Everything this thread has stored, oldest first."""
+        return [m["content"] for m in self.meta if m["thread_id"] == thread_id]
+
     # --- persistence ---
     def persist(self, directory: str) -> None:
         os.makedirs(directory, exist_ok=True)

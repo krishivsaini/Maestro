@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     max_steps: int = 40  # global backstop: total node executions per run
     max_critic_iters: int = 3
     max_recovery_attempts: int = 2
+
+    # --- Follow-ups ---
+    # Check that a follow-up is about its thread's research before any agent runs
+    # (see maestro/guard.py). MAESTRO_FOLLOWUP_GUARD=false turns it off.
+    followup_guard: bool = True
     loop_detect_threshold: int = 5  # same delegation dispatched this many times -> loop
 
     # --- LLM request bounds ---

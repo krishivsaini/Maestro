@@ -24,6 +24,7 @@ from pydantic import BaseModel
 
 from .config import get_settings
 from .graph import MaestroAgents, build_default_agents, build_graph
+from .guard import FollowUpGuard, ThreadContext, split_follow_up
 from .logging_config import get_logger
 from .memory import HashingEmbedder, LongTermMemory
 from .resilience import is_rate_limit_error
@@ -67,6 +68,7 @@ def create_app(
     memory: object = None,
     trace_store: Optional[TraceStore] = None,
     memory_dir: Optional[str] = None,
+    followup_classifier=None,
 ) -> FastAPI:
     """Build the FastAPI app. Inject stub ``agents`` / an in-memory store for tests.
 
@@ -74,6 +76,10 @@ def create_app(
     recall its thread's findings after a restart; held only in RAM, every restart
     silently turned follow-ups on earlier runs into fresh starts. Injected stub agents
     stay in-memory unless a ``memory_dir`` is passed explicitly.
+
+    A follow-up (a run in a thread that already has runs) is checked against that
+    thread's research first; see maestro/guard.py. Stub agents have no model to check
+    with, so their guard is off unless a ``followup_classifier`` is injected.
     """
     settings = get_settings()
     injected = agents is not None  # stub agents (tests) are not model-switchable
@@ -120,6 +126,26 @@ def create_app(
         alt = build_default_agents(cfg)
         alt.memory = agents.memory  # every graph shares the one long-term memory
         return build_graph(agents=alt, settings=cfg, event_sink=event_sink), target
+
+    def thread_context(thread_id: Optional[str]) -> Optional[ThreadContext]:
+        """The research a follow-up in this thread has to stay within; None for a new thread."""
+        if not thread_id:
+            return None
+        runs = store.list_runs(thread_id=thread_id)
+        if not runs:
+            return None
+        root, latest = store.get_run(runs[0]["run_id"]), store.get_run(runs[-1]["run_id"])
+        question = split_follow_up(root.goal)[0] or root.goal if root else runs[0]["goal"]
+        findings = getattr(agents.memory, "findings", None)
+        brief = latest.final_output.content[:1500] if latest and latest.final_output else ""
+        return ThreadContext(question=question, plan=[s.description for s in (root.subtasks if root else [])],
+                             findings=findings(thread_id) if findings else [], brief=brief)
+
+    def guard_for(api_key: Optional[str]) -> FollowUpGuard:
+        if injected and followup_classifier is None:
+            return FollowUpGuard(settings, enabled=False)
+        cfg = settings.model_copy(update={"google_api_key": api_key}) if api_key else settings
+        return FollowUpGuard(cfg, classifier=followup_classifier, enabled=settings.followup_guard)
 
     app = FastAPI(title="Maestro", version="0.1.0")
 
@@ -174,6 +200,18 @@ def create_app(
                  run_id, thread_id, req.model or settings.model_id, bool(req.api_key), req.goal)
 
         def stream():
+            # A follow-up must be about its thread's research. Checked before any agent
+            # runs, so an off-topic question costs at most one small call, not a run.
+            ctx = thread_context(req.thread_id)
+            if ctx is not None:
+                verdict = guard_for(req.api_key).check(split_follow_up(req.goal)[1], ctx)
+                log.info("run %s follow-up guard: %s (%s) %s", run_id,
+                         "allowed" if verdict.allowed else "BLOCKED", verdict.method, verdict.reason)
+                if not verdict.allowed:
+                    yield _sse({"type": "blocked", "reason": verdict.reason,
+                                "question": split_follow_up(req.goal)[1], "thread_id": thread_id})
+                    return
+
             # The graph only yields between nodes, so a slow node (planning, or a call
             # climbing the backoff ladder) would leave the viewer silent for a minute
             # with no way to tell waiting from hung. Run the graph on its own thread

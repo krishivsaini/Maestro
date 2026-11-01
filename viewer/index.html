@@ -343,6 +343,11 @@
   .thread-note { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 12px 0 0; padding: 9px 12px; font-size: 13px;
     color: var(--text-2); border-left: 3px solid var(--v-memory); background: rgba(166,151,212,.08); border-radius: var(--r-sm); }
   .kv ul { margin: 0; padding-left: 18px; } .kv li { margin: 2px 0; }
+  /* A follow-up the server refused: off the thread's research. Only ever shown then. */
+  .guard-note { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-top: 12px;
+    padding: 10px 14px; border-left: 3px solid var(--amber); background: rgba(224,160,76,.08);
+    border-radius: var(--r-sm); font-size: 13.5px; color: var(--text-2); }
+  .guard-note p { margin: 0; flex: 1 1 320px; }
 
   /* ---- past runs ---- */
   .history { margin-top: 44px; }
@@ -417,6 +422,10 @@
       <button class="primary" id="run" type="button">Run agents</button>
     </div>
     <div class="examples" id="examples"><span class="try">Try</span></div>
+    <div class="guard-note" id="ask-block" hidden role="alert">
+      <p id="ask-block-text"></p>
+      <button class="linkbtn" id="ask-new" type="button">Start it as a new question</button>
+    </div>
     <p class="thread-note" id="thread-note" hidden>
       <span>New runs continue thread <code id="thread-note-id"></code> and can use its memory.</span>
       <button class="linkbtn" id="thread-clear" type="button">Start a new thread instead</button>
@@ -548,6 +557,10 @@
       </div>
       <div class="examples" id="fu-suggest"><span class="try">Try</span></div>
       <p class="hint" id="fu-hint"></p>
+      <div class="guard-note" id="fu-block" hidden role="alert">
+        <p id="fu-block-text"></p>
+        <button class="linkbtn" id="fu-new" type="button">Start it as a new question</button>
+      </div>
     </div>
   </section>
 
@@ -1300,9 +1313,22 @@ async function conduct(opts = {}) {
   const api_key = $("keyin").value.trim() || null;
   if (keyRequired && !api_key) { showKey("Paste a Gemini API key to run."); return; }
   playToken++;                                    // stop any replay in progress
-  $("run").disabled = $("fu-run").disabled = true; $("run").textContent = "Running…";
-  startView({ mode: "live", goal, threadId: thread_id });
-  $("runbar").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  const where = opts.input === $("fu-in") ? "fu" : "ask";
+  hideBlocks();
+  $("run").disabled = $("fu-run").disabled = true;
+  // A run in an existing thread is a follow-up, which the server first checks against
+  // the thread's research. The view only changes once the run is accepted, so a
+  // refused follow-up leaves the brief you were reading exactly where it was.
+  let started = false, blocked = false;
+  const begin = () => {
+    if (started) return;
+    started = true;
+    $("run").textContent = "Running…"; $("fu-run").textContent = "Ask";
+    startView({ mode: "live", goal, threadId: thread_id });
+    $("runbar").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  };
+  if (thread_id) { if (where === "fu") $("fu-run").textContent = "Checking…"; else $("run").textContent = "Checking…"; }
+  else begin();                                   // a new thread is never checked
   try {
     const resp = await fetch(api("/run"), { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goal, thread_id, model: currentModel, api_key }) });
@@ -1319,19 +1345,24 @@ async function conduct(opts = {}) {
         const line = frame.split("\n").find((l) => l.startsWith("data:"));
         if (!line) continue;
         const ev = JSON.parse(line.slice(5).trim());
+        if (ev.type === "blocked") { blocked = true; showBlocked(ev, where); continue; }
+        begin();
         if (ev.type === "run_started") { run.runId = ev.run_id; run.threadId = ev.thread_id; addNote(ev); pokeSilence(true); }
         else if (ev.type === "final") showFinal(ev);
         // A backoff event sets its own retry status; pokeSilence would overwrite it.
         else { addNote(ev); if (ev.type !== "rate_limit_backoff") pokeSilence(true); }
       }
     }
+    if (blocked) return;
+    if (!started) begin();
     if (!run.done) showFinal({ status: "error", error: "The connection closed before the run finished." });
   } catch (e) {
+    if (!started) begin();
     if (!run.done) showFinal({ status: "error", error: `Lost the connection to the server (${e.message}). Check that it is running, then try again.` });
   } finally {
     pokeSilence(false); clearInterval(clock);
-    $("run").disabled = $("fu-run").disabled = false; $("run").textContent = "Run agents";
-    loadRuns();
+    $("run").disabled = $("fu-run").disabled = false; $("run").textContent = "Run agents"; $("fu-run").textContent = "Ask";
+    if (!blocked) loadRuns();
   }
 }
 
@@ -1438,6 +1469,25 @@ async function prepareThreadCopy(t, runs) {
   threadCopy = { text: threadAsText(records), count: records.filter((x) => x.final_output && x.final_output.content).length };
   resetCopy("copy-thread");
 }
+// --- off-topic follow-ups -----------------------------------------------------------
+// The server refused a follow-up as outside its thread's research. Say why, and offer
+// to ask it as a new question, which starts a fresh thread with no memory attached.
+let refused = "";
+function showBlocked(ev, where) {
+  refused = ev.question || "";
+  $(where + "-block-text").textContent = ev.reason || "That's outside this thread's research.";
+  $(where + "-block").hidden = false;
+  $(where === "fu" ? "fu-in" : "goal").focus();
+}
+function hideBlocks() { $("fu-block").hidden = $("ask-block").hidden = true; }
+function startAsNew() {
+  hideBlocks();
+  $("threadin").value = ""; optSummary();
+  $("goal").value = refused;
+  window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+  $("goal").focus({ preventScroll: true });
+}
+
 function askFollowUp() {
   const q = $("fu-in").value.trim();
   if (!q) { $("fu-in").focus(); return; }
@@ -1586,6 +1636,9 @@ $("followup").onclick = () => {
   $("fu-in").focus({ preventScroll: true });
 };
 $("fu-run").onclick = askFollowUp;
+$("fu-new").onclick = $("ask-new").onclick = startAsNew;
+$("fu-in").addEventListener("input", () => { $("fu-block").hidden = true; });
+$("goal").addEventListener("input", () => { $("ask-block").hidden = true; });
 $("fu-in").addEventListener("keydown", (e) => { if (e.key === "Enter") askFollowUp(); });
 $("thread-clear").onclick = () => { $("threadin").value = ""; optSummary(); $("goal").focus(); };
 for (const q of FOLLOW_UPS) {

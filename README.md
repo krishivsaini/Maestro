@@ -129,6 +129,7 @@ Both the critic-rejection and recovery paths are triggerable on demand for a dem
 | **Rate-limit resilience** | Every LLM/tool call is wrapped in exponential backoff + jitter (tenacity), retrying 429s **and** transient 5xx/network errors — added after a live Gemini 503. |
 | **Loop & cost control** | `MAX_STEPS` backstop + stall/repeat detectors so a multi-agent run can't spiral in calls or cost. |
 | **Long-term memory** | FAISS inner-product index; findings written on completion, recalled during planning on a later turn of the same thread. Swappable embedder (local `bge-small`, or a no-torch hashing embedder for tests). |
+| **Follow-up guardrail** | A follow-up must be about its thread's research. A free term-overlap check passes clear cases; otherwise one temperature-0 model call decides, and steering attempts ("ignore your instructions") always get the model check. Off-topic follow-ups are refused before any agent runs, with the reason and an offer to ask them as a new question. |
 | **Observability** | Every transition is a `TraceEvent`; each run is persisted to SQLite and **replayable node-by-node**, exportable as JSON. |
 | **Service + viewer** | FastAPI `POST /run` streams the coordination as SSE; a minimal web viewer renders it live and replays past runs. |
 
@@ -143,7 +144,7 @@ git clone https://github.com/krishivsaini/Maestro.git
 cd Maestro
 uv sync                       # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 66 passed, 1 skipped
+# run the full test suite (offline, no API key) — 76 passed, 1 skipped
 uv run pytest
 
 # see the coordination in the browser
@@ -238,7 +239,7 @@ What the free tier costs you, concretely:
 
 ## Tests
 
-`uv run pytest` → **66 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
+`uv run pytest` → **76 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
 exceeded, dependents wait), `test_critic_loop`, `test_recovery`, `test_loop_control`, plus memory,
 trace-replay, service, and writer-citation tests.
