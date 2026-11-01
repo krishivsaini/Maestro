@@ -154,6 +154,9 @@ class CriticVerdict(BaseModel):
     # True when a re-review finds that a revision fixed none of the open issues: the
     # loop is not converging, so it stops rather than spending more calls.
     stalled: bool = False
+    # Research questions for issues no rewrite can fix (the evidence doesn't cover it):
+    # the supervisor can add researcher subtasks for them before the next revision.
+    research: list[str] = Field(default_factory=list)
 
     def open_issues(self, *severities: str) -> list[ReviewIssue]:
         sev = severities or ("blocker", "major", "minor")
@@ -268,6 +271,7 @@ class MaestroState(TypedDict, total=False):
     step_count: int
     critic_iterations: int
     recovery_attempts: int
+    replans: int  # extra research rounds the critic has triggered
 
     # outputs
     final_output: Optional[Answer]
@@ -295,6 +299,7 @@ def new_state(
         step_count=0,
         critic_iterations=0,
         recovery_attempts=0,
+        replans=0,
         final_output=None,
         status=RunStatus.running.value,
         trace=[],

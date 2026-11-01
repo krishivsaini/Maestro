@@ -99,6 +99,7 @@ def _review_summary(v) -> dict:
         "open": {s: len(v.open_issues(s)) for s in ("blocker", "major", "minor")},
         "resolved": sum(i.status == "resolved" for i in v.issues),
         "stalled": v.stalled,
+        "research": list(v.research),
         "claims": claims,
         "issues": [i.model_dump(include={"id", "severity", "criterion", "problem", "status", "origin"})
                    for i in v.issues],
@@ -333,6 +334,8 @@ def build_graph(
         updated, verdict = ag.critic.run(
             critic_st, state["goal"], state["analysis"], state.get("evidence", []),
             iteration=iteration, prior=verdicts[-1].issues if verdicts else None,
+            # a research round needs a review after it, and must be within the budget
+            can_research=state.get("replans", 0) < cfg.max_replans and iteration < cfg.max_critic_iters,
             on_retry=_backoff_recorder(events, "critic", subtask_id=critic_st.id),
         )
         etype = EventType.critic_pass if verdict.decision == CriticDecision.passed else EventType.critic_reject
@@ -343,6 +346,48 @@ def build_graph(
             "critic_verdicts": [verdict],
             "critic_iterations": iteration,
             "subtasks": [updated],
+            "trace": events,
+            "step_count": state.get("step_count", 0) + 1,
+        }
+
+    def replan_node(state: MaestroState) -> dict:
+        """The critic found a gap no rewrite can fix: research it, then revise.
+
+        New researcher subtasks join the plan (announced as a replan, so a live viewer
+        shows them) and run bounded-parallel like the first round. Their evidence is
+        appended, so every evidence number the draft already cites stays valid. Extra
+        research that fails is marked degraded: the run goes on without it, flagged.
+        """
+        last = state["critic_verdicts"][-1]
+        round_ = state.get("replans", 0) + 1
+        existing = {s.id for s in state["subtasks"]}
+        subs = []
+        for k, question in enumerate(last.research[: cfg.max_research_requests], start=1):
+            sid = f"research_more_{round_}" + (f"_{k}" if len(last.research) > 1 else "")
+            while sid in existing:
+                sid += "_"
+            existing.add(sid)
+            subs.append(Subtask(id=sid, description=question, role=Role.researcher))
+        events: list[TraceEvent] = []
+        _emit(events, _ev(EventType.plan_replanned, "supervisor",
+                          f"critic asked for more evidence: added {len(subs)} subtasks: {[s.id for s in subs]}",
+                          data={"plan": [{"id": s.id, "role": s.role.value, "description": s.description,
+                                          "depends_on": []} for s in subs]}))
+        updated, evidence, run_events, _ = _run_researchers(subs, "dispatched")
+        events.extend(run_events)
+        settled = []
+        for st in updated:
+            if st.status == SubtaskStatus.failed:
+                st = st.model_copy(update={"status": SubtaskStatus.degraded})
+                _emit(events, _ev(EventType.degraded, "supervisor",
+                                  f"degraded {st.id}: the extra research found nothing usable; revising without it",
+                                  subtask_id=st.id))
+            settled.append(st)
+        log.info("replan %d: %d subtasks, %d evidence", round_, len(subs), len(evidence))
+        return {
+            "subtasks": settled,
+            "evidence": evidence,
+            "replans": round_,
             "trace": events,
             "step_count": state.get("step_count", 0) + 1,
         }
@@ -358,6 +403,9 @@ def build_graph(
         # global safety nets: step ceiling or a stalled (no-progress) critic loop
         if step_ceiling_reached(state, cfg) or stuck_in_critic_loop(state):
             return "write"
+        # a gap only new evidence can fill: research it first, within the budget
+        if last.research and state.get("replans", 0) < cfg.max_replans:
+            return "replan"
         return "revise"
 
     def write_node(state: MaestroState) -> dict:
@@ -433,6 +481,7 @@ def build_graph(
     sg.add_node("analyze", analyze_node)
     sg.add_node("critique", critique_node)
     sg.add_node("write", write_node)
+    sg.add_node("replan", replan_node)
 
     sg.add_edge(START, "supervisor")
     sg.add_edge("supervisor", "research")
@@ -441,7 +490,9 @@ def build_graph(
     sg.add_conditional_edges("recover", recover_router, _recover_map)
     sg.add_edge("degrade", "analyze")
     sg.add_edge("analyze", "critique")
-    sg.add_conditional_edges("critique", critic_router, {"revise": "analyze", "write": "write"})
+    sg.add_conditional_edges("critique", critic_router,
+                             {"revise": "analyze", "replan": "replan", "write": "write"})
+    sg.add_edge("replan", "analyze")
     sg.add_edge("write", END)
     return sg.compile()
 

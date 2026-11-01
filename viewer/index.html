@@ -802,6 +802,7 @@ function humanize(ev) {
     case "run_started": return ev.model ? `Started on ${shortModel(ev.model)}` : "Run started";
     case "plan_produced": case "plan_replanned": {
       const n = (ev.plan || (ev.data && ev.data.plan) || idsIn(s)).length;
+      if (k === "plan_replanned") return n ? `Added ${n} research subtask${n === 1 ? "" : "s"} to fill a gap` : s;
       return n ? `Split the question into ${n} subtasks` : s;
     }
     case "subtask_dispatched":
@@ -970,6 +971,7 @@ function renderInspector() {
     if (checked) rows.push(["Claims checked", checked]);
     if (rv.resolved) rows.push(["Fixed", `${plural(rv.resolved, "earlier issue")} confirmed fixed`]);
     if (rv.stalled) rows.push(["Stopped", "The revision fixed none of the open issues, so the loop ended here"]);
+    if ((rv.research || []).length) rows.push(["Asked for research", `<ul>${rv.research.map((q) => `<li>${esc(q)}</li>`).join("")}</ul>`]);
     const open = (rv.issues || []).filter((i) => i.status === "open");
     const order = { blocker: 0, major: 1, minor: 2 };
     if (open.length) rows.push(["Issues", `<ul>${open.sort((a, b) => order[a.severity] - order[b.severity])

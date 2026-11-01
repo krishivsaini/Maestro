@@ -70,6 +70,15 @@ def test_checks_flag_a_draft_resting_on_one_source():
     assert any("rests on 1 of 5" in i.problem for i in precheck(GOAL, draft, EV))
 
 
+def test_declining_to_recommend_is_not_a_commitment():
+    from maestro.agents.critic import commits
+
+    assert not commits("A final recommendation cannot be responsibly made without typhoon data.")
+    assert not commits("There is no single answer to recommend; it depends on the island.")
+    assert commits("No single answer fits every island. We recommend solar with storage.")
+    assert commits("Start with PostgreSQL; it is the better default.")
+
+
 def test_no_recommendation_is_required_when_none_is_asked():
     draft = AnalysisDraft(content="Both have merits.", claims=["a"], refs=[[1]])
     assert precheck("Explain how solar power works", draft, EV) == []
@@ -226,15 +235,18 @@ def test_the_writer_sees_the_review_and_states_open_issues_as_caveats(make_stub)
     Writer(model=make_stub(responder)).run(Subtask(id="write", description="w", role=Role.writer),
                                            GOAL, CLEAN, EV, validated=False, review=review)
     assert "C2. solar peaks midday  [reviewer: UNSUPPORTED]" in seen[0]
-    assert "state these as caveats" in seen[0] and "cost dimension missing" in seen[0]
+    assert "NOT fully validated" in seen[0]
+    assert "state these as limitations" in seen[0] and "cost dimension missing" in seen[0]
 
 
-def test_a_validated_brief_gets_no_caveats(make_stub):
+def test_a_validated_brief_states_open_majors_but_not_minors(make_stub):
     seen = []
     Writer(model=make_stub(lambda s, m: seen.append(m[-1][1]) or WriterOutput(content="b", citations=[]))).run(
         Subtask(id="write", description="w", role=Role.writer), GOAL, CLEAN, EV, validated=True,
-        review=CriticVerdict(decision=CriticDecision.passed, issues=[issue(1, "minor")]))
-    assert "caveats" not in seen[0]
+        review=CriticVerdict(decision=CriticDecision.passed,
+                             issues=[issue(1, "minor", problem="polish"), issue(2, "major", problem="onshore wind not covered")]))
+    assert "NOT fully validated" not in seen[0]
+    assert "onshore wind not covered" in seen[0] and "polish" not in seen[0]
 
 
 # --- the researcher -----------------------------------------------------------------------
@@ -300,6 +312,26 @@ def test_a_miscited_claim_is_a_blocker(make_stub):
                                      ClaimCheckOut(claim=2, verdict="supported")])
     _, v = Critic(model=make_stub(critic_returning(out))).run(CRIT, GOAL, CLEAN, EV)
     assert v.decision == CriticDecision.rejected and "[3] states it" in v.open_issues("blocker")[0].problem
+
+
+def test_ads_and_tracking_redirects_are_not_search_results():
+    from maestro.tools.web_search import is_ad
+
+    assert is_ad("https://www.bing.com/aclick?ld=e8tz&u=aHR0cCUzYSUy")
+    assert is_ad("https://example.com/page?gclid=abc")
+    assert not is_ad("https://www.sciencedirect.com/science/article/pii/S0196890421004520")
+
+
+def test_a_truncated_long_url_still_matches_its_result():
+    url = "https://www.researchgate.net/publication/351736703_Wind_power_potential_and_intermittency_issues"
+    kept = _ground([ResearchFinding(source=url[:60], content="truncated by the model")], [{"url": url}])
+    assert [f.source for f in kept] == [url]
+
+
+def test_a_source_with_its_title_appended_still_matches():
+    kept = _ground([ResearchFinding(source="https://www.mdpi.com/2073-4433/13/3/451 Typhoon Resistance - MDPI",
+                                    content="url plus title")], [{"url": "https://www.mdpi.com/2073-4433/13/3/451"}])
+    assert [f.source for f in kept] == ["https://www.mdpi.com/2073-4433/13/3/451"]
 
 
 def test_a_source_counts_however_it_is_written():

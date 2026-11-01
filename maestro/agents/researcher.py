@@ -91,7 +91,14 @@ def _ground(findings: list[ResearchFinding], data: list[dict]) -> list[ResearchF
     kept: list[ResearchFinding] = []
     seen: list[set[str]] = []
     for f in findings:
-        src = lookup.get(_key(f.source))
+        raw = f.source.strip()
+        url = re.search(r"https?://\S+", raw)
+        key = _key(url.group(0) if url else raw)  # "URL  Page title - Site" -> the URL
+        src = lookup.get(key)
+        if src is None and len(key) >= 30:
+            # a long URL the model shortened or truncated: one shown result it is a prefix of
+            hits = {s for k, s in lookup.items() if k.startswith(key) or key.startswith(k) and len(k) >= 30}
+            src = hits.pop() if len(hits) == 1 else None
         if src is None:
             m = _BY_NUMBER.match(f.source.strip())
             if m and 1 <= int(m.group(1)) <= len(shown):
@@ -140,8 +147,11 @@ class Researcher(Subagent):
         )
         grounded = _ground(findings.findings, result.data)
         if len(grounded) < len(findings.findings):
-            self.log.info("researcher %s dropped %d ungrounded or duplicate findings", subtask.id,
-                          len(findings.findings) - len(grounded))
+            kept = {(g.content) for g in grounded}
+            odd = sorted({f.source for f in findings.findings if f.content.strip() not in kept})
+            self.log.info("researcher %s dropped %d ungrounded or duplicate findings (sources: %s; shown: %s)",
+                          subtask.id, len(findings.findings) - len(grounded), odd[:4],
+                          [r.get("url") or r.get("source") for r in result.data][:5])
         evidence = [Evidence(subtask_id=subtask.id, source=f.source, content=f.content) for f in grounded]
         if not evidence:
             return self._fail(subtask, "no grounded findings extracted from results"), []

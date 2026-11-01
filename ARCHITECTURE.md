@@ -106,12 +106,33 @@ renders as one node (the parallelism is *inside* it, not a graph-level branch).
 
 ## The critic loop (`maestro/agents/critic.py`)
 
-After the Analyst drafts, the Critic reviews it against the evidence and returns a structured
-verdict: **PASS**, or **REJECT + specific feedback**. On REJECT the `critique → analyze` edge
-routes the draft back to the Analyst, which revises using the feedback; the Critic reviews again.
+After the Analyst drafts (every claim citing the evidence numbers it rests on), the Critic reviews
+it in three layers:
+
+1. **Checks in code**, no model: uncited claims, citations to evidence that doesn't exist, figures
+   missing from the evidence they cite (or found in a different item: a miscitation), a draft
+   resting on one source, no recommendation when the goal asks for one.
+2. **A structured review**: every claim checked against its cited evidence (supported, partial,
+   overstated, miscited, unsupported, contradicted), plus issues by severity against a rubric
+   (grounding, coverage, reasoning, calibration, consistency).
+3. **The verdict is decided in code** from those findings: any blocker, or `CRITIC_MAJOR_LIMIT`
+   majors, sends the draft back. Minors never do.
+
+On REJECT the `critique → analyze` edge routes the draft back; the Analyst revises from its previous
+draft against the numbered issues and says what it changed for each. A re-review must confirm each
+fix (code-check issues are confirmed by the code) and may only add new blockers, so the goalposts
+stay put; a revision that fixes nothing marks the verdict `stalled` and the loop stops.
+
+When an issue can only be fixed with evidence the draft doesn't have, the critic attaches a research
+question and the `critique → replan` edge runs instead: the supervisor adds researcher subtasks for
+it mid-run (a `plan_replanned` event), their evidence is appended (existing citation numbers stay
+valid), and the Analyst revises with it. While a round remains (`MAX_REPLANS`, default 1), a serious
+gap with a research question sends the draft back even if it would otherwise pass.
+
 Bounded by `MAX_CRITIC_ITERS`; on the ceiling it degrades gracefully (best draft, flagged
-"not fully validated"). A genuine LLM critic can reject on its own; `force_critic_reject` makes a
-rejection reliably triggerable for the demo.
+"not fully validated"), and the Writer states unresolved issues as limitations. `force_critic_reject`
+makes a rejection reliably triggerable for the demo. `scripts/critic_eval.py` measures the critic on
+seeded-flaw drafts (see the README).
 
 ---
 

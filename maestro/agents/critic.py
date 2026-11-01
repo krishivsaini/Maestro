@@ -73,7 +73,9 @@ showing the evidence numbers it cites.
 2. ISSUES — problems with the draft as a whole, by criterion:
    - grounding: conclusions that rest on nothing in the evidence.
    - coverage: the goal is not fully answered (e.g. it asks for a recommendation and none is
-     committed to), or a dimension that decides the question is missing.
+     committed to), or a dimension that decides the question is missing. Declining to recommend
+     when the goal asks for a recommendation fails the goal: a blocker, however it is justified. If
+     the reason given is missing evidence, add a research question for what is missing.
    - reasoning: the conclusion does not follow from the claims, or the comparison is lopsided.
    - calibration: certainty beyond the evidence ("always", "guaranteed", one study as settled),
      or thin/conflicting evidence presented as solid.
@@ -81,6 +83,10 @@ showing the evidence numbers it cites.
    Severity: blocker = the draft would mislead or fails the goal; major = a real weakness a careful
    reader would object to; minor = polish. Do not repeat claim-check problems as issues.
    Give each issue a concrete fix.
+   When an issue is about something the evidence does not cover (a deciding dimension it never
+   addresses, or evidence too thin to support a judgement), put one focused research question in
+   `research` for that issue: what would have to be looked up to fix it. Leave `research` empty
+   when a rewrite of the draft could fix the issue.
 
 3. If PREVIOUS ISSUES are listed, this is a re-review of a revision: for each one, say whether it
    is now resolved. Raise new problems only if they are serious; do not move the goalposts.
@@ -101,6 +107,7 @@ class IssueOut(BaseModel):
     criterion: Literal["grounding", "coverage", "reasoning", "calibration", "consistency"]
     problem: str
     fix: str = ""
+    research: str = ""  # a question to research, when only new evidence can fix this
 
 
 class PriorStatus(BaseModel):
@@ -159,9 +166,24 @@ def render_claims(draft: AnalysisDraft) -> str:
 
 # ---- layer 1: checks in code -----------------------------------------------------------
 ASKS_FOR_CHOICE = re.compile(r"\b(recommend\w*|should|which|choose|better|best|pick)\b", re.I)
-COMMITS = re.compile(r"\b(recommend\w*|we suggest|suggests?|should (choose|use|pick|go|adopt|prefer)|"
-                     r"(is|are) the (better|best|stronger|safer) (choice|option|fit|bet)|prefer\w*|opt for|"
-                     r"choose|go with|the answer is)\b", re.I)
+# Phrasings that commit to an answer. Broad on purpose: a missed phrasing makes this check
+# fire on a draft that did commit (a false issue), while a draft that commits loosely is
+# still the model's to judge under "coverage".
+COMMITS = re.compile(r"\b(recommend\w*|(we|I) (would )?(advise|suggest|favou?r|prefer)|advisable|prefer(red|able)?|"
+                     r"should (choose|use|pick|go|adopt|prefer|start|stick|opt|select)|"
+                     r"(is|are|remains?) (the |a )?(better|best|stronger|safer|right|clear|sensible|wiser|smarter|"
+                     r"preferred|natural|obvious)\b|opt for|choose|go with|start with|stick with|"
+                     r"the answer is|winner)\b", re.I)
+# A sentence that declines ("a recommendation cannot responsibly be made") commits to nothing,
+# even though it says "recommendation".
+REFUSES = re.compile(r"(cannot|can't|can ?not|unable to|not possible to|impossible to|premature to|"
+                     r"no (single|clear|definitive|firm|universal))[^.]{0,80}?(recommend|choose|pick|winner|answer|decide)|"
+                     r"recommend\w*[^.]{0,40}?(cannot|can't|is not possible|isn't possible|would be premature)", re.I)
+
+
+def commits(content: str) -> bool:
+    """Whether the draft commits to an answer: some sentence that commits and doesn't decline."""
+    return any(COMMITS.search(s) and not REFUSES.search(s) for s in re.split(r"(?<=[.!?])\s+", content))
 
 
 _FIGURE = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(\s*(?:%|percent\b))?", re.I)
@@ -224,7 +246,7 @@ def precheck(goal: str, draft: AnalysisDraft, evidence: list[Evidence]) -> list[
     if n >= 4 and len(draft.claims) >= 2 and len(cited) <= 1:
         add("major", "grounding", f"The draft rests on {len(cited)} of {n} evidence items.",
             "Use the rest of the evidence, especially where it qualifies or contradicts the main point.")
-    if ASKS_FOR_CHOICE.search(goal) and not COMMITS.search(draft.content):
+    if ASKS_FOR_CHOICE.search(goal) and not commits(draft.content):
         add("major", "coverage", "The question asks for a recommendation, but the draft doesn't commit to one.",
             "State which option you recommend, and the condition under which that would change.")
     return found
@@ -307,10 +329,13 @@ class Critic(Subagent):
         *,
         iteration: int = 1,
         prior: Optional[list[ReviewIssue]] = None,
+        can_research: bool = False,
         on_retry: Optional[OnRetry] = None,
     ) -> tuple[Subtask, CriticVerdict]:
         """Return (updated subtask, verdict). ``iteration`` is the 1-based review number;
-        ``prior`` is the previous review's issues, for a re-review of a revision."""
+        ``prior`` is the previous review's issues, for a re-review of a revision.
+        ``can_research``: a research round is still available, so a serious gap that only
+        new evidence can fill sends the draft back for it rather than passing with the gap."""
         done = subtask.model_copy(update={"status": SubtaskStatus.done, "result": f"review {iteration}"})
         prior = [p for p in (prior or []) if p.status == "open" and p.severity != "minor"]
         next_id = max([p.id for p in (prior or [])] + [0]) + 1
@@ -373,14 +398,23 @@ class Critic(Subagent):
                 new(CLAIM_SEVERITY[c.verdict], "grounding", f"C{c.claim} {word} the evidence it cites: "
                     f"“{text}”" + (f" ({c.note})" if c.note else ""),
                     "Match the claim to what the evidence says, cite the right item, or drop it.")
+        research: list[str] = []
         for i in out.issues:
             new(i.severity, i.criterion, i.problem, i.fix)
+            # only a gap serious enough to block earns more research (a re-review's new
+            # findings have already been downgraded unless they are blockers)
+            q = i.research.strip()
+            if q and issues[-1].severity in ("blocker", "major") and q not in research:
+                research.append(q)
 
         decision = decide(issues, self.settings.critic_major_limit)
+        if decision == CriticDecision.passed and can_research and research:
+            decision = CriticDecision.rejected  # a fillable gap: get the evidence while we can
         stalled = bool(prior) and decision == CriticDecision.rejected and not any(
             i.status == "resolved" for i in issues)
         verdict = CriticVerdict(decision=decision, feedback=feedback_text(issues), iteration=iteration,
-                                issues=issues, claim_checks=checks, stalled=stalled)
+                                issues=issues, claim_checks=checks, stalled=stalled,
+                                research=research[: self.settings.max_research_requests])
         self.log.info("critic review %d -> %s (%d open blocker, %d open major, %d minor%s)", iteration,
                       decision.value, len(verdict.open_issues("blocker")), len(verdict.open_issues("major")),
                       len(verdict.open_issues("minor")), ", stalled" if stalled else "")

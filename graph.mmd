@@ -12,14 +12,17 @@ graph TD;
 	analyze(analyze)
 	critique(critique)
 	write(write)
+	replan(replan)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> supervisor;
 	analyze --> critique;
 	critique -. &nbsp;revise&nbsp; .-> analyze;
+	critique -.-> replan;
 	critique -.-> write;
 	degrade --> analyze;
 	recover -.-> analyze;
 	recover -.-> degrade;
+	replan --> analyze;
 	research -.-> analyze;
 	research -.-> degrade;
 	research -.-> recover;

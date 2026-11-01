@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     critic_model_id: str = ""
     critic_temperature: float = 0.0
     critic_major_limit: int = 2  # this many open major issues send a draft back
+    # When the critic finds a gap no rewrite can fix, the supervisor can add research
+    # for it before the revision. Bounded: each round costs a search and a call per question.
+    max_replans: int = 1
+    max_research_requests: int = 2
     max_recovery_attempts: int = 2
 
     # --- Follow-ups ---

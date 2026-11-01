@@ -38,8 +38,8 @@ Compose the FINAL cited brief from the analysis draft and the evidence.
   UNSUPPORTED or CONTRADICTED. For a claim marked MISCITED, cite the evidence that
   actually states it, never the one the analysis gave. State claims marked OVERSTATED
   as the evidence states them, with its qualifiers. State claims marked PARTIAL only as strongly as the
-  evidence allows. If open issues are listed, the analysis was not fully validated:
-  say so plainly in the brief and state those limitations as caveats.
+  evidence allows. If the analysis was not fully validated, say so plainly. State any
+  open issues listed below as limitations of the brief, briefly and honestly.
 Return the final brief text and the list of citations used."""
 
 
@@ -125,9 +125,11 @@ class Writer(Subagent):
             f"Claims:\n{claims}\n\n"
             f"Evidence (cite by id/source):\n{_render_evidence(evidence)}"
         )
-        open_issues = review.open_issues("blocker", "major") if review and not validated else []
+        open_issues = review.open_issues("blocker", "major") if review else []
+        if not validated:
+            human += "\n\nThe analysis was NOT fully validated by the reviewer."
         if open_issues:
-            human += "\n\nOpen issues the analysis did not resolve (state these as caveats):\n" + \
+            human += "\n\nOpen issues the analysis did not resolve (state these as limitations):\n" + \
                 "\n".join(f"- {i.problem}" for i in open_issues)
         out = self._structured(WriterOutput, human, on_retry=on_retry)
         notes = None if validated else (

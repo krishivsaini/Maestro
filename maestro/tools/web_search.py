@@ -9,6 +9,8 @@ the tool — decides whether an empty result warrants recovery.
 
 from __future__ import annotations
 
+import re
+
 from typing import Optional
 
 from ..config import get_settings
@@ -19,6 +21,15 @@ from .registry import ToolResult
 log = get_logger("tools.web_search")
 
 TOOL_NAME = "web_search"
+
+# Sponsored results and tracking redirects: an ad is not evidence, and its long redirect
+# URL is exactly what a model copies wrong. Seen live: a Bing "aclick" ad ranked first.
+_AD = re.compile(r"(bing\.com/aclick|duckduckgo\.com/y\.js|googleadservices\.com|doubleclick\.net|"
+                 r"/aclk\?|[?&](ad_?(id|type)|gclid|msclkid)=)", re.I)
+
+
+def is_ad(url: str) -> bool:
+    return bool(_AD.search(url or ""))
 
 
 def _ddgs_text(query: str, max_results: int) -> list[dict]:
@@ -57,6 +68,10 @@ def web_search(
         }
         for r in (raw or [])
     ]
+    ads = [r for r in results if is_ad(r["url"])]
+    if ads:
+        log.info("web_search dropped %d sponsored/redirect result(s)", len(ads))
+        results = [r for r in results if not is_ad(r["url"])]
     if not results:
         return ToolResult.success(TOOL_NAME, [], empty=True, query=query)
     return ToolResult.success(TOOL_NAME, results, query=query, count=len(results))

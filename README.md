@@ -26,14 +26,17 @@ composition. The multi-agent structure isn't decoration; the task doesn't reduce
 ![Maestro StateGraph](graph.png)
 
 ```
-START → supervisor → research ─┬─▶ analyze ─▶ critique ─┬─(PASS / ceiling)─▶ write → END
-                               │                        │
-                    (failed)   ├─▶ recover ⟳ (retry)    └─(REJECT & under ceiling)─▶ analyze
-                               │       │
-                    (exhausted)└─▶ degrade ─▶ analyze
+START → supervisor → research ─┬─▶ analyze ─▶ critique ─┬─(PASS / ceiling)─────────────▶ write → END
+                               │       ▲                ├─(REJECT, rewrite can fix it)─▶ analyze
+                    (failed)   ├─▶ recover ⟳ (retry)    └─(REJECT, evidence missing)──▶ replan
+                               │       │                                                  │
+                    (exhausted)└─▶ degrade ─▶ analyze ◀───── new research, then revise ───┘
 ```
 
-Every edge is a real LangGraph edge. The `research` node fans out to N researcher subtasks
+Every edge is a real LangGraph edge. When the critic finds a gap that only new evidence can fill, it
+attaches a research question; `replan` adds researcher subtasks for it mid-run (streamed as a
+`plan_replanned` event), appends their evidence, and the analyst revises with it. One round per run by
+default (`MAX_REPLANS`, at most `MAX_RESEARCH_REQUESTS` questions), so a run's cost stays bounded. The `research` node fans out to N researcher subtasks
 concurrently at runtime via a bounded thread pool (`MAX_PARALLEL`), then fans in — it renders as a
 single node because the parallelism is internal to the node, not a graph-level `Send` branch.
 
@@ -145,7 +148,7 @@ git clone https://github.com/krishivsaini/Maestro.git
 cd Maestro
 uv sync                       # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 110 passed, 1 skipped
+# run the full test suite (offline, no API key) — 121 passed, 1 skipped
 uv run pytest
 
 # see the coordination in the browser
@@ -241,7 +244,7 @@ What the free tier costs you, concretely:
 
 ## Tests
 
-`uv run pytest` → **110 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
+`uv run pytest` → **121 passed, 1 skipped**, offline (LLM stubbed, no key/quota). The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
 exceeded, dependents wait), `test_critic_loop`, `test_critic_review`, `test_recovery`, `test_loop_control`,
 plus memory, trace-replay, service, guardrail and writer-citation tests.
