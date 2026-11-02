@@ -1,41 +1,55 @@
 # Maestro
 
 [![tests](https://github.com/krishivsaini/Maestro/actions/workflows/tests.yml/badge.svg)](https://github.com/krishivsaini/Maestro/actions/workflows/tests.yml)
+![python](https://img.shields.io/badge/python-3.11+-3776AB)
+![langgraph](https://img.shields.io/badge/orchestration-LangGraph-1C3C3C)
+[![live demo](https://img.shields.io/badge/live%20demo-online-2ea44f)](https://maestro-bb8l.onrender.com)
 
-> **A supervisor-orchestrated multi-agent system with visible delegation and recovery.**
->
-> A supervisor agent decomposes a goal into subtasks at runtime and delegates each to a
-> role-specialized subagent (Researcher, Analyst, Critic, Writer), each with its own context.
-> Researchers read real web pages in bounded parallel; a Critic checks every claim against its
-> evidence and can send the draft back for a rewrite, or send a gap back to research; failures
-> recover visibly (retry → re-delegate → degrade); a person can review the plan before research,
-> and a run that fails partway resumes from its last finished step. Every run is replayable
-> node-by-node and reports what it cost. Built on LangGraph, runs on the Gemini free tier.
+**A multi-agent research system where the agents check each other's work, and every decision is visible.**
+
+Give Maestro a hard question (*"Compare PostgreSQL and MongoDB for a startup's first product, and
+recommend one"*). A supervisor plans the research at runtime, researchers read real web pages in
+parallel, an analyst drafts a cited argument, a critic verifies every claim against its evidence and
+sends the work back when it falls short, and a writer produces the final brief. You watch all of it
+stream live.
 
 https://github.com/user-attachments/assets/4956f815-f2f3-4dc4-a0ac-8a024fb712ee
 
-**[Graph diagram](#the-graph)** &nbsp;·&nbsp; **[Architecture](ARCHITECTURE.md)**
+**[Live demo](https://maestro-bb8l.onrender.com)** &nbsp;·&nbsp; **[Architecture](ARCHITECTURE.md)** &nbsp;·&nbsp;
+**[How it works](#how-it-works)** &nbsp;·&nbsp; **[Engineering decisions](#engineering-decisions)** &nbsp;·&nbsp;
+**[Run it](#run-it-locally)**
 
-The task it performs — *"produce a cited analytical brief on a non-trivial question"* (e.g. *"Compare
-PostgreSQL and MongoDB for a startup's first product, and recommend one"*) — is deliberately chosen
-because it genuinely **requires** decomposition into different specialists: independent research that
-parallelizes, an analysis that depends on it, a critique that can send the analysis back, and a final
-composition. The multi-agent structure isn't decoration; the task doesn't reduce to a single prompt.
-
-### Measured, not claimed
-
-| | Result | Where |
-|---|---|---|
-| Critic: planted flaws caught | **20 / 20** (the earlier PASS/REJECT critic: 12 / 20), every clean draft still passed | [Critic evaluation](#critic-evaluation) |
-| Critic on a topic it was never tuned on | **5 / 5** (earlier critic: 3 / 5) | [Critic evaluation](#critic-evaluation) |
-| Memory: follow-ups worded differently from their findings | right finding ranked first **12 / 12** by meaning, 1 / 12 by word matching | [Design](#design-highlights) |
-| Page reading | 20 of 29 real result pages readable; findings carrying figures rose from 37% to 70% on the solar question | [Limitations](#limitations-deliberate-scope-choices) |
-| A typical run | 6 model calls, ~11k tokens, per agent in the viewer | [Design](#design-highlights) |
-| Tests | 176 offline, plus Postgres variants and three recorded live runs replayed in CI on every push | [Tests](#tests) |
+<sub>The demo runs on free tiers: the first request after 15 idle minutes takes about a minute to wake the server.</sub>
 
 ---
 
-## The graph
+## Why it exists
+
+Ask one LLM prompt for a cited brief and you get confident text with citations nobody checked. Maestro
+treats that as a coordination problem: split the work across specialists with separate contexts, make
+one of them an adversarial reviewer whose verdict is computed in code, and make every hand-off,
+rejection and recovery an observable, replayable event.
+
+The question type was chosen because it genuinely decomposes: independent research parallelizes, the
+analysis depends on it, the critique can send the analysis back, and composition comes last. The
+multi-agent structure is load-bearing, not decoration.
+
+## Results
+
+Every number here comes from a script or test in this repo.
+
+| What was measured | Result |
+|---|---|
+| Critic: drafts with one planted flaw each, caught | **20 / 20** (the earlier PASS/REJECT critic: 12 / 20), with every correct draft still passed |
+| Critic on a held-out topic it was never tuned on | **5 / 5** (earlier critic: 3 / 5) |
+| Memory: follow-ups worded differently from their findings | right finding ranked first **12 / 12** by meaning vs **1 / 12** by word matching (MRR 1.00 vs 0.36) |
+| Reading pages instead of search snippets | findings that carry real figures: **37% → 70%** on the solar question; 20 of 29 real result pages readable |
+| Cost of a typical run | **6 model calls, ~11k tokens**, broken down per agent in the viewer |
+| Tests | **176 offline** + Postgres variants + **3 recorded live runs replayed** on every push in CI |
+
+---
+
+## How it works
 
 ![Maestro StateGraph](graph.png)
 
@@ -47,36 +61,115 @@ START → supervisor → research ─┬─▶ analyze ─▶ critique ─┬─
                     (exhausted)└─▶ degrade ─▶ analyze ◀───── new research, then revise ───┘
 ```
 
-Every edge is a real LangGraph edge. When the critic finds a gap that only new evidence can fill, it
-attaches a research question; `replan` adds researcher subtasks for it mid-run (streamed as a
-`plan_replanned` event), appends their evidence, and the analyst revises with it. One round per run by
-default (`MAX_REPLANS`, at most `MAX_RESEARCH_REQUESTS` questions), so a run's cost stays bounded. The `research` node fans out to N researcher subtasks
-concurrently at runtime via a bounded thread pool (`MAX_PARALLEL`), then fans in — it renders as a
-single node because the parallelism is internal to the node, not a graph-level `Send` branch.
+| Node | Role |
+|---|---|
+| `supervisor` | Decomposes the goal into a validated `Plan` (subtasks, roles, dependencies, search queries); recalls the thread's memory |
+| `research` | Fans out researcher subtasks on a bounded thread pool; each searches, reads the top pages, and returns grounded findings |
+| `recover` / `degrade` | The recovery ladder for a failed researcher: retry, re-delegate, then continue on partial evidence, flagged |
+| `analyze` | Drafts claims, each citing numbered evidence; revises against the critic's numbered issues |
+| `critique` | Code checks plus a claim-by-claim model review; the verdict is computed in code |
+| `replan` | Adds new researcher subtasks mid-run when the critic finds a gap only new evidence can fill |
+| `write` | Composes the brief, drops claims the critic found unsupported, states open issues as caveats |
 
-With *review the plan* on, the graph is compiled with `interrupt_before=["research"]`: it stops after
-`supervisor`, a person edits the researchers' questions, and the same checkpointed run continues.
+Five agents (supervisor + four specialists), each with its own prompt and context; the only thing they
+share is typed state passed through the supervisor. Every arrow above is a real LangGraph edge, every
+transition is a `TraceEvent` streamed over SSE, and every node is checkpointed.
 
-### Why LangGraph for this orchestration
-
-The supervisor pattern **is** a graph: a controller node routing to specialist nodes over a shared
-typed state, with conditional edges for delegation, the critic loop, and recovery. Once a system
-needs runtime routing between agents, a critic loop that sends work back, bounded parallel branches,
-and recovery edges, hand-rolling that coordination means reinventing a graph/state engine — badly;
-LangGraph is purpose-built for exactly that, so the build concentrates on the hard parts (making the
-coordination observable, recoverable, and honestly multi-agent). See **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+**Why LangGraph:** the supervisor pattern *is* a graph: a controller routing between specialists over
+typed state, with conditional edges for delegation, critique and recovery. Building that by hand means
+reinventing a state machine with persistence; using one let the work go into making the coordination
+correct, observable and recoverable. More in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ---
 
-## What it actually does (real runs)
+## Engineering decisions
 
-All traces below are **real output from the system**, not mock-ups.
+### 1. A critic whose verdict is computed, not vibed
+An LLM asked "is this good? PASS/REJECT" approves too much and is inconsistent. So the critic is split
+in two. **Code** first checks what needs no model: uncited claims, citations to evidence that doesn't
+exist, figures that don't appear in the evidence they cite, a missing recommendation. Then **the model**
+grades every claim against its cited evidence (supported, partial, overstated, miscited, unsupported,
+contradicted) and raises issues by severity. **The verdict is decided in code** from those findings: any
+blocker, or two majors, rejects.
 
-### A live run — dynamic decomposition + parallel research + memory
+Re-reviews track issue ids, so the critic must confirm each fix and can't move the goalposts (it may only
+add new blockers), and a revision that fixes nothing stops the loop instead of burning quota. Evaluated
+on a seeded-flaw set with a held-out topic ([results](#critic-evaluation)).
 
-A live Gemini free-tier run. The supervisor decomposed the goal at runtime (note the goal-specific
-subtask ids), the two researchers ran concurrently, the critic passed, and distilled findings were
-written to long-term memory for later turns:
+### 2. The critic can send work back to research, not just to rewrite
+Some flaws can't be fixed by rewording; the evidence simply isn't there. The critic can attach a research
+question to an issue, and the `replan` node adds researcher subtasks for it mid-run, appends their
+evidence, and has the analyst revise. Bounded (`MAX_REPLANS=1`, at most 2 questions) so cost stays
+predictable.
+
+### 3. Grounded research, and web text treated as hostile
+The planner writes 1-3 search queries per researcher; results are merged, the top pages are fetched and
+extracted with the standard library, and only passages relevant to the question are kept (falling back
+to the snippet when a page blocks readers or is a PDF). A finding is dropped unless its source is one of
+the results the researcher was actually shown, so researchers can't invent sources.
+
+Pages are third-party input to an LLM, so sentences addressing an AI ("ignore previous instructions…")
+are stripped before a researcher sees them, pages are wrapped in untrusted-content markers, and any
+finding that still carries instructions is discarded.
+
+### 4. Failures are expected, bounded and visible
+Tools return structured failures instead of raising into the graph. A failing researcher climbs a logged
+ladder (retry → re-delegate → degrade) and the run completes on partial evidence, marked `degraded`
+rather than silently wrong. Every model and tool call has exponential backoff with jitter for 429s and
+transient 5xx/network errors (added after a real Gemini 503), and a step budget plus stall and repeat
+detectors guarantee a run can't spiral.
+
+### 5. Human in the loop, and runs that survive failure
+Every node is checkpointed (Postgres in production, SQLite locally). That buys two features from one
+mechanism:
+- **Plan review:** the graph is compiled with `interrupt_before=["research"]`. A person can edit, remove
+  or add research questions, and the same run continues with the edits validated against the plan.
+- **Resume:** a run that dies partway (say, quota runs out at the analyst) offers *Resume* and continues
+  from its last finished node, without redoing planning or research. Both go through `POST /runs/{id}/resume`.
+
+### 6. Memory that recalls by meaning, and degrades instead of failing
+Findings are saved per conversation thread and recalled when planning a follow-up. Each finding stores a
+Gemini embedding (documents and queries embedded asymmetrically, vectors tagged by model so different
+models are never compared) plus a cheap word vector. If the embedding API is down, recall falls back to
+words rather than failing the run. No vector extension is needed: a thread holds a handful of findings,
+ranked in numpy, so any Postgres works.
+
+### 7. Guardrails on follow-up questions
+A follow-up re-runs the whole pipeline, so an off-topic one wastes ~8 calls and produces a brief that
+pretends to build on unrelated research. A free term-overlap check passes clear cases; otherwise one
+temperature-0 model call decides. Steering attempts always get the model check. If the guard itself
+fails it lets the question through, since a guard outage shouldn't block a legitimate question.
+
+### 8. Cost is a first-class output
+Every model call is metered at the client boundary: agent, model, input/output tokens, latency, success
+(failed retries included), plus embedding calls. The breakdown streams with the result, is stored with
+the run, and appears in the viewer. A dollar estimate is shown only when per-token prices are configured;
+nothing is assumed.
+
+### 9. Testing real model behavior, not just stubs
+Stubbed tests prove the mechanics but not that the code still behaves on real model output.
+`scripts/record_run.py` records a live run at the model, search and page boundaries into a **cassette**
+with no secrets. `tests/test_replays.py` replays each cassette through the current code in about a
+second, with planning validation, scheduling, grounding, the critic's decision and routing all running
+for real. If a change makes the code decide differently on the same model output, the test names exactly
+what changed. A missing recording raises a `BaseException`, so the recovery ladder can't quietly absorb
+it.
+
+### 10. Built to be left running in public
+The demo uses a shared free API key, so it's protected before any model call: per-IP sliding-window
+limits (6/hour; more with your own key), a shared daily cap, proxy-aware client IPs, and validated input
+with messages a visitor can act on. A visitor's own key is used for their run only and never stored or
+logged. Runs and memory live in Supabase Postgres; if the database is unreachable the service falls back
+to local storage and says so on `/healthz` instead of failing to start.
+
+---
+
+## Real runs
+
+All traces are real output from the system.
+
+<details>
+<summary><b>Dynamic decomposition, parallel research, memory</b></summary>
 
 ```
 goal: Should a startup use PostgreSQL or MongoDB for its first product?
@@ -93,17 +186,14 @@ status=completed  subtasks=5  critic_iters=1  recoveries=0
   memory_write        supervisor    stored 5 finding(s) to long-term memory
   completed           supervisor    run completed (completed)
 ```
+</details>
 
-### The critic can disagree — reject → revise → pass
-
-The Critic reviews the draft against the evidence and can **REJECT with feedback**; the `critique →
-analyze` edge routes it back to the Analyst, which revises, and the Critic reviews again (bounded by
-`MAX_CRITIC_ITERS`). This is the "it's really multi-agent" signal — one agent overrules another:
+<details>
+<summary><b>The critic overrules the analyst: reject → revise → pass</b></summary>
 
 ```
 status=completed  subtasks=5  critic_iters=2  recoveries=0
 
-  ...
   subagent_result   analyst   (analyze)    analysis draft rev 0
   critic_reject     critic    (critique)   review 1: REJECT      verdict=REJECT
   subagent_result   analyst   (analyze)    analysis draft rev 1   ← revised on the critic's feedback
@@ -111,12 +201,10 @@ status=completed  subtasks=5  critic_iters=2  recoveries=0
   subagent_result   writer    (write)      final brief composed
   completed         supervisor             run completed (completed)
 ```
+</details>
 
-### Failures recover visibly — retry → re-delegate → degrade
-
-When a researcher reports a **structured failure** (tools never raise raw into the graph), the
-supervisor climbs an explicit, logged ladder. Here a search keeps failing; after the recovery
-ceiling the subtask degrades and the run **still completes on partial evidence**, flagged honestly:
+<details>
+<summary><b>A researcher keeps failing: retry → re-delegate → degrade, and the run still completes</b></summary>
 
 ```
 status=degraded  subtasks=5  critic_iters=1  recoveries=2
@@ -131,203 +219,151 @@ status=degraded  subtasks=5  critic_iters=1  recoveries=2
   critic_pass         critic      (critique)     review 1: PASS
   completed           supervisor                 run completed (degraded)
 ```
+</details>
 
-Both the critic-rejection and recovery paths are triggerable on demand for a demo
-(`MAESTRO_FORCE_CRITIC_REJECT=1`, `MAESTRO_FAULT_INJECTION=true`).
-
----
-
-## Design highlights
-
-| Concern | How it's handled |
-|---|---|
-| **Dynamic decomposition** | LLM returns a structured Pydantic `Plan` (subtasks + roles + `depends_on`), validated for cycles/dupes/size. Different goals → structurally different plans. |
-| **Separate contexts** | Each subagent has its own system prompt and sees only its task + relevant structured inputs — the only cross-agent hand-off is structured data via the supervisor. |
-| **Bounded parallelism** | Independent researchers run concurrently in a thread pool capped at `MAX_PARALLEL` (default 2); dependents wait. Concurrency is *observed* so the claim is measurable. |
-| **Critic loop** | A structured review, not a vibe check. Code first checks what needs no model (uncited claims, citations to evidence that doesn't exist, figures that aren't in the evidence they cite, no recommendation when one is asked). The model then checks every claim against its cited evidence (supported, partial, overstated, miscited, unsupported, contradicted) and raises issues by severity; **the verdict is decided in code** from those findings. A re-review must confirm each fix and may only add new blockers, and a revision that fixes nothing stops the loop. Bounded by `MAX_CRITIC_ITERS`; degrades gracefully at the ceiling. |
-| **Grounded agents** | The Analyst cites evidence numbers on every claim and revises from its previous draft against numbered issues. Researchers search with 1-3 queries the planner wrote for them, read the top pages rather than only search snippets, and keep the passages relevant to their question; findings are dropped if their source isn't one of the results they were shown, and near-duplicates are removed. The Writer leaves out claims the critic found unsupported and states unresolved issues as caveats. |
-| **Visible recovery** | retry → re-delegate → degrade, bounded by `MAX_RECOVERY_ATTEMPTS`; every rung is a trace event. |
-| **Rate-limit resilience** | Every LLM/tool call is wrapped in exponential backoff + jitter (tenacity), retrying 429s **and** transient 5xx/network errors — added after a live Gemini 503. |
-| **Loop & cost control** | `MAX_STEPS` backstop + stall/repeat detectors so a multi-agent run can't spiral in calls or cost. |
-| **Long-term memory** | Findings are written on completion and recalled during planning on a later turn of the same thread, from the same database as the runs (SQLite, or Postgres when deployed). Recall is **by meaning** (Gemini embeddings, findings and questions embedded as documents vs queries) with a word-matching fallback, so an embedding outage degrades recall instead of failing the run. On 12 follow-ups phrased in different words from their findings (`scripts/memory_eval.py`), meaning recall ranked the right finding first 12/12, word matching 1/12. |
-| **Follow-up guardrail** | A follow-up must be about its thread's research. A free term-overlap check passes clear cases; otherwise one temperature-0 model call decides, and steering attempts ("ignore your instructions") always get the model check. Off-topic follow-ups are refused before any agent runs, with the reason and an offer to ask them as a new question. |
-| **Observability** | Every transition is a `TraceEvent`; each run is persisted (SQLite, or Postgres when deployed) and **replayable node-by-node**, exportable as JSON. Every run also records **what it cost**: each model call's agent, tokens, latency and success (failed retries included) plus embedding calls, streamed with the result, kept with the run, and shown in the viewer's step details (a typical run: 6 calls, ~11k tokens). A dollar estimate appears only if you set per-token prices. |
-| **Human in the loop** | Tick *Review the plan before research starts* and the run pauses after planning (a LangGraph interrupt): edit a researcher's question or searches, remove one, or add one, then start research. Every node is checkpointed (SQLite, or Postgres when deployed), so a paused run survives a restart, and a run that fails partway (say, quota spent at the analyst) offers **Resume**, continuing from its last finished step without redoing planning or research. `POST /runs/{id}/resume` does both. |
-| **Service + viewer** | FastAPI `POST /run` streams the coordination as SSE; a minimal web viewer renders it live and replays past runs. |
+Both failure paths can be triggered on demand: `MAESTRO_FORCE_CRITIC_REJECT=1`, `MAESTRO_FAULT_INJECTION=true`.
 
 ---
 
-## Reproducing
+## Run it locally
 
 Requires [`uv`](https://docs.astral.sh/uv/) and Python ≥ 3.11.
 
 ```bash
-git clone https://github.com/krishivsaini/Maestro.git
-cd Maestro
-uv sync                       # deterministic install from uv.lock
+git clone https://github.com/krishivsaini/Maestro.git && cd Maestro
+uv sync                                   # deterministic install from uv.lock
 
-# run the full test suite (offline, no API key) — 176 passed, 8 skipped
-uv run pytest
+uv run pytest                             # offline, no API key: 176 passed, 8 skipped
 
-# see the coordination in the browser
-cp .env.example .env          # then add your GOOGLE_API_KEY (free tier)
+cp .env.example .env                      # add a free GOOGLE_API_KEY
 uv run uvicorn maestro.serve:create_app --factory
-# open http://127.0.0.1:8000 and give it a goal
+# open http://127.0.0.1:8000 and ask a question
 
-# or run the lightweight eval cases (typical / parallelism / critic / recovery / ceiling / memory)
-uv run python scripts/demo_cases.py list
-uv run python scripts/demo_cases.py run crit-01     # watch a forced critic rejection
+uv run python scripts/demo_cases.py list           # scripted cases: parallelism, critic, recovery, memory...
+uv run python scripts/demo_cases.py run crit-01    # watch a forced critic rejection
 ```
 
-The model id is swappable in `maestro/config.py` (or `MAESTRO_MODEL_ID`); the free tier is
-`gemini-3.5-flash-lite` with `gemini-3.6-flash` as the fuller-model alternative. The free tier meters
-requests per model per day, so the alternative is a genuinely separate budget, switchable from the
-viewer mid-run. The lite model leads because a shared public demo exhausts the full-size Flash quota
-first, and it finishes a run in ~40s rather than minutes.
+The model is swappable via `MAESTRO_MODEL_ID`: `gemini-3.5-flash-lite` by default (fast, and the free
+tier's most generous quota), `gemini-3.6-flash` as the fuller alternative, switchable from the viewer
+mid-run because the free tier meters each model separately.
+
+---
+
+## Testing and evaluation
+
+`uv run pytest` runs **176 tests offline** (models stubbed, no key or quota). The Postgres variants run
+when `MAESTRO_TEST_DATABASE_URL` is set, as they are in CI against a real Postgres 16 service. The hard
+parts each have a proof: decomposition, parallelism (independent subtasks overlap, the cap is never
+exceeded, dependents wait), the critic loop and structured review, replanning, recovery, loop control,
+page reading, plan review and resume, cost metering, usage limits, storage, memory recall, guardrails
+and citations.
+
+### Recorded runs, replayed
+
+```bash
+python scripts/record_run.py "Compare solar and wind ..." --name solar-wind   # record a live run
+python scripts/record_run.py --refresh solar-wind                            # accept a deliberate change
+```
+
+Three cassettes (`data/cassettes/`) replay on every push in GitHub Actions: no key, no quota.
+
+### Critic evaluation
+
+`scripts/critic_eval.py` runs a critic over `data/critic_eval_cases.json`: per topic, one draft that is
+correct against its evidence and five copies with one planted flaw each (wrong citation, overclaim,
+unsupported claim, contradiction, missing recommendation). A good critic rejects every flawed draft and
+passes every clean one. The old critic is reproduced in the script and shown the same citations, so the
+comparison measures the reviewing, not access to information.
+
+| Critic (model) | Flaws caught | Clean drafts passed |
+|---|---|---|
+| Before: PASS/REJECT verdict (`gemini-3.5-flash-lite`) | 12 / 20 | 4 / 4 |
+| Structured review (`gemini-3.5-flash-lite`, the default) | **20 / 20** | 4 / 4 |
+| Structured review (`gemini-3.6-flash`) | 19 / 20 | 4 / 4 |
+
+The old critic caught none of the wrong citations. One topic (`k8s-swarm`) was written after tuning on
+the other three and run once, to check the result isn't fitted to the tuning set: the new critic caught
+5/5, the old one 3/5.
+
+`scripts/memory_eval.py` measures recall the same way, on 12 follow-ups phrased in different words from
+the findings they should retrieve.
 
 ---
 
 ## Deploying
 
-The service ships as a container: [`Dockerfile`](Dockerfile) builds it, [`render.yaml`](render.yaml)
-is a one-click [Render](https://render.com) Blueprint for the free tier.
+The service is one container: [`Dockerfile`](Dockerfile) builds it, [`render.yaml`](render.yaml) is a
+one-click [Render](https://render.com) Blueprint. It needs a **long-lived container**, not serverless
+functions, because `POST /run` streams SSE for the length of a multi-agent run.
 
 ```bash
-# build and run locally, exactly as the host will
-docker build -t maestro .
-docker run --rm -p 8000:8000 -e GOOGLE_API_KEY=... maestro
-# open http://127.0.0.1:8000
+docker build -t maestro . && docker run --rm -p 8000:8000 -e GOOGLE_API_KEY=... maestro
 ```
 
-**On Render:** push this repo to GitHub, then Dashboard → **New** → **Blueprint** → select the repo.
-Render reads `render.yaml` and prompts for `GOOGLE_API_KEY` (stored encrypted, never committed).
-No credit card required.
+- **Durable storage:** set `DATABASE_URL` to any Postgres. On Supabase, use the **Session pooler**
+  string, not the direct connection (IPv6-only on the free plan, unreachable from Render). Tables are
+  created on first start; `GET /healthz` reports which storage is live (`"storage": "postgres"`).
+- **Behind a proxy:** set `MAESTRO_TRUST_PROXY=true` so limits use the real client IP from
+  `X-Forwarded-For`, and only behind a proxy, since anyone can send that header.
+- **Limits:** `MAESTRO_RUN_LIMIT_PER_IP` (default 6/hour) and `MAESTRO_SHARED_DAILY_RUNS` (default 60).
 
-### Hosting the viewer separately
-
-The viewer is a single static file with no build step, so it can be served from a CDN while the
-API stays on Render. The page then loads instantly even when the backend has spun down, and says
-so plainly instead of hanging:
-
-> ● warming the orchestra… **12s** — the free tier sleeps after 15 min idle
-
-1. Deploy `viewer/` to any static host (Cloudflare Pages, Netlify — both read `viewer/_headers`).
-2. Set the API origin in `viewer/config.js`:
-   ```js
-   window.MAESTRO_API = "https://maestro-xxxx.onrender.com";
-   ```
-3. Point the API back at it — set `MAESTRO_CORS_ORIGINS` to the static host's origin in the Render
-   dashboard. Empty by default, which leaves CORS off; that is correct while FastAPI serves the
-   viewer itself, since same-origin needs no headers.
-
-`?api=<origin>` overrides `config.js`, which is how you point a local copy of the page at a
-deployed backend without editing anything.
-
-None of this is required — FastAPI still serves the viewer at `/`, so the single container remains
-self-contained.
-
-The image is **about 130MB compressed** (about 600MB unpacked) because it omits the `embeddings` extra:
-`sentence-transformers` pulls torch (~670MB installed), and the deployed service never needs it, since
-memory embeds through the Gemini API (`MAESTRO_MEMORY_EMBEDDER=gemini`, the default). Install the extra
-with `uv sync --extra embeddings` to embed locally instead.
-
-Anything hosting this needs a **long-lived container**, not serverless functions: `POST /run` streams
-SSE for the length of a multi-agent run, which function-style hosts (Vercel, Netlify) cut short.
-
-What the free tier costs you, concretely:
+<details>
+<summary><b>Free-tier numbers, and hosting the viewer on a CDN</b></summary>
 
 | | |
 |---|---|
-| **512MB RAM / 0.1 CPU** | A measured run peaks at ~187MB, so memory is fine; the thin CPU slows cold start, not runs (the work is I/O-bound on Gemini). |
-| **15-min idle spin-down** | The first visitor after a quiet spell waits ~1 min for the container to wake. Health checks don't keep it up. |
-| **Ephemeral disk** | Without a database, past runs and thread memory live in `/tmp` and reset on every restart and deploy. Set `DATABASE_URL` (below) and both are stored in Postgres instead. |
-| **Shared quota** | The server key is the free Gemini tier shared by every visitor, so runs are limited before any model call: 6 per visitor per hour and 60 per day on the shared key (`MAESTRO_RUN_LIMIT_PER_IP`, `MAESTRO_SHARED_DAILY_RUNS`). A visitor can add their own key in the viewer: it is used for that run only, never stored or logged, and their runs don't count toward the daily cap. |
+| **512MB RAM / 0.1 CPU** | A measured run peaks at ~187MB; the work is I/O-bound on Gemini, so the thin CPU only slows cold start. |
+| **15-min idle spin-down** | The first visitor after a quiet spell waits ~1 min for the container to wake. |
+| **Image size** | ~130MB compressed. The `embeddings` extra (sentence-transformers → torch) is left out because memory embeds through the Gemini API; `uv sync --extra embeddings` embeds locally instead. |
 
-### Keeping runs and memory across restarts
-
-Create a free Postgres database (for example a [Neon](https://neon.tech) project; Supabase works too),
-copy its connection string, and set it as `DATABASE_URL` in the Render dashboard. On Supabase, use the
-**Session pooler** (or Transaction pooler) string from *Connect*, not the direct connection: the direct
-one is IPv6-only on the free plan and Render can't reach it. `GET /healthz` reports which storage is live
-(`"storage": "postgres"`), so a deploy can be checked without reading its logs; if the database can't be
-reached, the service falls back to local storage and says so there instead of failing to start. Maestro creates its
-tables on first start and stores runs and thread memory there; with no `DATABASE_URL` it uses SQLite
-and files as before. Recall needs no vector extension (a thread holds a handful of findings, ranked in
-Python), so any Postgres works.
-
-### Safety on a public demo
-
-- **Usage limits** as above, per visitor IP (behind Render's proxy, from `X-Forwarded-For`; set
-  `MAESTRO_TRUST_PROXY=true` only behind a proxy, since anyone can send that header).
-- **Validated input**: questions up to 500 characters, thread ids and keys checked, with messages a
-  visitor can act on.
-- **Web text is data**: researchers read third-party pages, so sentences addressing an AI ("ignore
-  previous instructions…") are removed before a researcher sees them, the pages are marked as
-  untrusted in its prompt, a finding that still carries instructions is dropped, and every agent that
-  handles evidence treats it as data, not instructions.
-- **Off-topic follow-ups** are refused before any agent runs (see the follow-up guardrail).
+The viewer is one static file with no build step, so it can live on a CDN (Cloudflare Pages, Netlify)
+and load instantly even while the backend wakes, showing *"warming the orchestra… 12s"* instead of
+hanging. Set the API origin in `viewer/config.js`, and set `MAESTRO_CORS_ORIGINS` on the API to the
+static host's origin. `?api=<origin>` points any copy of the page at a backend without editing it.
+FastAPI still serves the viewer at `/`, so none of this is required.
+</details>
 
 ---
 
-## Limitations (deliberate scope choices)
+## Trade-offs and limitations
 
-- **Retrieval is web search plus page reading**, not production RAG. Researchers search with planned
-  queries and read the top pages (stdlib HTML extraction, relevant passages kept), but pages that block
-  automated readers, render only with JavaScript, or are PDFs fall back to their search snippet; in a
-  sample of 29 real result pages, 20 were readable.
-- **Evaluation is lightweight** — ~15 scripted cases that demonstrate behavior (including failure and
-  recovery), a 24-draft seeded-flaw set for the critic (below) and a 12-question recall set for memory;
-  not a metrics framework, and final brief quality is hand-judged.
-- **One task domain** (analytical briefs) — chosen because it genuinely decomposes across specialists;
-  the orchestration generalizes, the prompts are domain-specific.
-- **Free-tier concurrency cap** — `MAX_PARALLEL=2` because the Gemini free tier allows only a few
-  requests a minute and one run makes 6–10 calls. The parallelism is real and **scales to higher
-  concurrency on a paid tier** by raising the cap — the design already bounds and backs off; only the
-  number changes.
-- **One instance** — usage limits are counted in memory, so they hold for a single container (what the
-  free tier runs); several instances would need a shared counter. A paused run nobody comes back to keeps
-  its checkpoints until the database is cleaned.
+Deliberate scope choices, stated plainly:
+
+- **Retrieval is web search plus page reading, not a RAG pipeline.** Pages that block automated readers,
+  need JavaScript, or are PDFs fall back to their search snippet (9 of 29 in a sample).
+- **Parallelism is capped at 2** because the free tier allows only a few requests a minute and a run
+  makes 6-10 calls. The scheduler is real and bounded; on a paid tier only the number changes.
+- **Evaluation is targeted, not a benchmark.** The critic and memory have seeded evaluation sets; final
+  brief quality is still judged by hand.
+- **One domain.** The orchestration generalizes; the prompts are written for analytical briefs.
+- **One instance.** Usage limits are counted in memory, which is right for a single container; several
+  would need a shared counter (e.g. Redis). Checkpoints of a paused run nobody returns to aren't yet
+  garbage-collected.
 
 ---
 
-## Tests
+## Repository map
 
-`uv run pytest` → **176 passed, 8 skipped**, offline (LLM stubbed, no key/quota); the 5 Postgres variants of the storage tests run when `MAESTRO_TEST_DATABASE_URL` is set, as in CI. The hard parts each
-have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
-exceeded, dependents wait), `test_critic_loop`, `test_critic_review`, `test_recovery`, `test_loop_control`,
-plus page reading, replanning, plan review and resume, cost metering, usage limits, storage, memory
-recall, trace-replay, service, guardrail and writer-citation tests.
-
-### Recorded runs, replayed
-
-Stubbed tests prove the mechanics, but not that the code still behaves on *real* model output.
-`data/cassettes` holds recorded live runs: every model response and search result, and what the run
-produced. `tests/test_replays.py` replays each one offline through the current code in about a second:
-planning validation, scheduling, grounding and code checks, the critic's decision, routing, citations
-all run for real; only the model and the search engine are played back. If the code now decides
-differently on the same output, the test says exactly what changed.
-
-```bash
-python scripts/record_run.py "Compare solar and wind ..." --name solar-wind   # record (live)
-python scripts/record_run.py --refresh solar-wind                            # accept a deliberate change
+```
+maestro/
+  graph.py           StateGraph: nodes, routing, replan, plan edits, checkpoints
+  supervisor.py      planning and plan validation
+  scheduler.py       bounded parallel execution of subtasks
+  agents/            researcher, analyst, critic, writer
+  tools/             web search, page fetching and extraction
+  memory/            thread memory (Postgres/SQLite, Gemini embeddings + word fallback)
+  guard.py           follow-up guardrail
+  resilience.py      backoff and retry
+  loop_control.py    step budget, stall and repeat detection
+  usage.py           per-call cost metering
+  cassette.py        record and replay live runs
+  limits.py          per-visitor and daily usage limits
+  db.py              one storage seam over SQLite and Postgres
+  serve.py           FastAPI: SSE streaming, resume, threads, health
+viewer/index.html    the live viewer (single file, no build)
+scripts/             record_run, critic_eval, memory_eval, demo_cases, render_graph
+tests/               offline suite, Postgres variants, cassette replays
 ```
 
-Every push runs the whole suite, replays included, in GitHub Actions: no key, no quota.
-
-### Critic evaluation
-
-`scripts/critic_eval.py` runs a critic over `data/critic_eval_cases.json`: per topic, a clean draft that is
-correct against its evidence and five copies with one planted flaw each. A good critic rejects every flawed
-draft and passes every clean one. The critic before the structured review is reproduced in the script, shown
-the same citations, so the comparison measures the reviewing rather than access to information.
-
-| Critic (model) | Flaws caught | Clean drafts passed |
-|---|---|---|
-| Before: PASS/REJECT verdict (`gemini-3.5-flash-lite`) | 12 / 20 | 4 / 4 |
-| Structured review (`gemini-3.5-flash-lite`, the default) | 20 / 20 | 4 / 4 |
-| Structured review (`gemini-3.6-flash`) | 19 / 20 | 4 / 4 |
-
-The old critic caught none of the wrong citations. One topic (`k8s-swarm`) was written after the critic
-was tuned on the other three and run once, to check the result isn't fitted to the tuning cases: the new
-critic caught 5/5 there, the old one 3/5. Each run is 24 live calls, paced for the free tier's
-15 requests/minute.
+**Stack:** Python 3.11 · LangGraph · FastAPI (SSE) · Gemini · Pydantic · PostgreSQL (Supabase) / SQLite ·
+numpy · tenacity · pytest · GitHub Actions · Docker · Render
