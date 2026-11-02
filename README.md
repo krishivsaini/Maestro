@@ -6,10 +6,11 @@
 >
 > A supervisor agent decomposes a goal into subtasks at runtime and delegates each to a
 > role-specialized subagent (Researcher, Analyst, Critic, Writer), each with its own context.
-> Independent subtasks run in bounded parallel; a Critic subagent can reject and return work until
-> it passes; subagent failures recover visibly (retry → re-delegate → degrade); and every run is
-> replayable node-by-node. Built on LangGraph, runs on the Gemini free tier with exponential
-> backoff and a concurrency cap.
+> Researchers read real web pages in bounded parallel; a Critic checks every claim against its
+> evidence and can send the draft back for a rewrite, or send a gap back to research; failures
+> recover visibly (retry → re-delegate → degrade); a person can review the plan before research,
+> and a run that fails partway resumes from its last finished step. Every run is replayable
+> node-by-node and reports what it cost. Built on LangGraph, runs on the Gemini free tier.
 
 https://github.com/user-attachments/assets/4956f815-f2f3-4dc4-a0ac-8a024fb712ee
 
@@ -20,6 +21,17 @@ PostgreSQL and MongoDB for a startup's first product, and recommend one"*) — i
 because it genuinely **requires** decomposition into different specialists: independent research that
 parallelizes, an analysis that depends on it, a critique that can send the analysis back, and a final
 composition. The multi-agent structure isn't decoration; the task doesn't reduce to a single prompt.
+
+### Measured, not claimed
+
+| | Result | Where |
+|---|---|---|
+| Critic: planted flaws caught | **20 / 20** (the earlier PASS/REJECT critic: 12 / 20), every clean draft still passed | [Critic evaluation](#critic-evaluation) |
+| Critic on a topic it was never tuned on | **5 / 5** (earlier critic: 3 / 5) | [Critic evaluation](#critic-evaluation) |
+| Memory: follow-ups worded differently from their findings | right finding ranked first **12 / 12** by meaning, 1 / 12 by word matching | [Design](#design-highlights) |
+| Page reading | 20 of 29 real result pages readable; findings carrying figures rose from 37% to 70% on the solar question | [Limitations](#limitations-deliberate-scope-choices) |
+| A typical run | 6 model calls, ~11k tokens, per agent in the viewer | [Design](#design-highlights) |
+| Tests | 176 offline, plus Postgres variants and three recorded live runs replayed in CI on every push | [Tests](#tests) |
 
 ---
 
@@ -41,6 +53,9 @@ attaches a research question; `replan` adds researcher subtasks for it mid-run (
 default (`MAX_REPLANS`, at most `MAX_RESEARCH_REQUESTS` questions), so a run's cost stays bounded. The `research` node fans out to N researcher subtasks
 concurrently at runtime via a bounded thread pool (`MAX_PARALLEL`), then fans in — it renders as a
 single node because the parallelism is internal to the node, not a graph-level `Send` branch.
+
+With *review the plan* on, the graph is compiled with `interrupt_before=["research"]`: it stops after
+`supervisor`, a person edits the researchers' questions, and the same checkpointed run continues.
 
 ### Why LangGraph for this orchestration
 
@@ -211,9 +226,10 @@ deployed backend without editing anything.
 None of this is required — FastAPI still serves the viewer at `/`, so the single container remains
 self-contained.
 
-The image is **about 130MB compressed** (about 600MB unpacked) because it omits the `embeddings` extra — `sentence-transformers` pulls torch
-(~670MB installed), and long-term memory defaults to `HashingEmbedder`, so the deployed service never
-needs it. Install it locally with `uv sync --extra embeddings` if you want real semantic embeddings.
+The image is **about 130MB compressed** (about 600MB unpacked) because it omits the `embeddings` extra:
+`sentence-transformers` pulls torch (~670MB installed), and the deployed service never needs it, since
+memory embeds through the Gemini API (`MAESTRO_MEMORY_EMBEDDER=gemini`, the default). Install the extra
+with `uv sync --extra embeddings` to embed locally instead.
 
 Anything hosting this needs a **long-lived container**, not serverless functions: `POST /run` streams
 SSE for the length of a multi-agent run, which function-style hosts (Vercel, Netlify) cut short.
@@ -260,14 +276,17 @@ Python), so any Postgres works.
   automated readers, render only with JavaScript, or are PDFs fall back to their search snippet; in a
   sample of 29 real result pages, 20 were readable.
 - **Evaluation is lightweight** — ~15 scripted cases that demonstrate behavior (including failure and
-  recovery), plus a 24-draft seeded-flaw set for the critic (below); not a metrics framework, and final
-  output quality is hand-judged.
+  recovery), a 24-draft seeded-flaw set for the critic (below) and a 12-question recall set for memory;
+  not a metrics framework, and final brief quality is hand-judged.
 - **One task domain** (analytical briefs) — chosen because it genuinely decomposes across specialists;
   the orchestration generalizes, the prompts are domain-specific.
-- **Free-tier concurrency cap** — `MAX_PARALLEL=2` because the Gemini free tier is ~10 RPM and one run
-  makes 6–10 calls; the daily request cap means ~2 live runs/model/day. The parallelism is real and
-  **scales to higher concurrency on a paid tier** by raising the cap — the design already bounds and
-  backs off; only the number changes.
+- **Free-tier concurrency cap** — `MAX_PARALLEL=2` because the Gemini free tier allows only a few
+  requests a minute and one run makes 6–10 calls. The parallelism is real and **scales to higher
+  concurrency on a paid tier** by raising the cap — the design already bounds and backs off; only the
+  number changes.
+- **One instance** — usage limits are counted in memory, so they hold for a single container (what the
+  free tier runs); several instances would need a shared counter. A paused run nobody comes back to keeps
+  its checkpoints until the database is cleaned.
 
 ---
 
@@ -276,7 +295,8 @@ Python), so any Postgres works.
 `uv run pytest` → **176 passed, 8 skipped**, offline (LLM stubbed, no key/quota); the 5 Postgres variants of the storage tests run when `MAESTRO_TEST_DATABASE_URL` is set, as in CI. The hard parts each
 have a proof: `test_decomposition`, `test_parallelism` (independent subtasks overlap, cap never
 exceeded, dependents wait), `test_critic_loop`, `test_critic_review`, `test_recovery`, `test_loop_control`,
-plus memory, trace-replay, service, guardrail and writer-citation tests.
+plus page reading, replanning, plan review and resume, cost metering, usage limits, storage, memory
+recall, trace-replay, service, guardrail and writer-citation tests.
 
 ### Recorded runs, replayed
 
