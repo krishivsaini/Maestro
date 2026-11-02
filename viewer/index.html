@@ -230,7 +230,7 @@
   .arcs { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: visible; }
   .arcs path { fill: none; stroke: var(--v-critic); stroke-width: 2; opacity: .9;
     stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw .7s ease forwards; }
-  .arcs .cap { fill: var(--v-critic); }
+  .arcs .cap { fill: var(--v-critic); stroke: none; animation: none; stroke-dasharray: none; }
   .arcs text { fill: var(--v-critic); font-family: var(--font-ui); font-size: 11px; font-weight: 600; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
 
@@ -552,7 +552,7 @@
   </div>
   <div class="legend" id="legend" hidden>
     <span><i style="--c: var(--green)"></i>Approved</span>
-    <span><i class="arc" style="--c: var(--v-critic)"></i>Sent back for revision</span>
+    <span><i class="arc" style="--c: var(--v-critic)"></i>Sent back by the critic</span>
     <span><i style="--c: var(--amber)"></i>Recovery or skipped</span>
     <span><i style="--c: var(--v-memory)"></i>Memory</span>
     <span>Select any step for details, or use the ← → keys.</span>
@@ -791,7 +791,7 @@ function relayout() {
   canvas.style.setProperty("--note-w", NOTE_W() + "px");
   for (const n of notes) { n.x = PAD_X + n.beat * BEAT_W(); n.el.style.left = n.x + "px"; }
   arcs.innerHTML = "";
-  for (const [from, to] of arcPairs) drawArc(from, to, true);
+  for (const [from, to, where] of arcPairs) drawArc(from, to, true, where);
   extendCanvas();
   if (notes[selected]) placePlayhead(notes[selected]);
 }
@@ -907,11 +907,16 @@ function addNote(ev) {
   const i = notes.push(note) - 1;
   el.onclick = () => select(i, true);
 
-  // signature: critic REJECT -> next analyst output draws a loop-back arc
-  if (kind === "critic_reject") pendingReject = note;
-  else if (kind === "subagent_result" && agent === "analyst" && pendingReject) {
-    arcPairs.push([pendingReject, note]);
-    drawArc(pendingReject, note); pendingReject = null;
+  // signature: a critic REJECT draws an arc to wherever the work went next. A rewrite
+  // goes back to the analyst; a gap that needs evidence goes to the new researcher the
+  // supervisor added (plan_replanned), and only then on to the analyst.
+  if (kind === "critic_reject") { pendingReject = note; pendingReject.replan = false; }
+  else if (kind === "plan_replanned" && pendingReject) pendingReject.replan = true;
+  else if (pendingReject && ((pendingReject.replan && agent === "researcher") ||
+                             (kind === "subagent_result" && agent === "analyst"))) {
+    const to = agent === "researcher" ? "research" : "analyst";
+    arcPairs.push([pendingReject, note, to]);
+    drawArc(pendingReject, note, false, to); pendingReject = null;
   }
   applyPlan(ev); applyStage(ev);
   extendCanvas();
@@ -940,28 +945,44 @@ function reveal(n, lead) {
   if (lead) cwrap.scrollLeft = Math.max(0, n.x + NOTE_W() / 2 - vw * 0.62);
   else if (n.x < cwrap.scrollLeft || n.x + NOTE_W() > cwrap.scrollLeft + vw) cwrap.scrollLeft = Math.max(0, n.x - vw * 0.3);
 }
-function drawArc(from, to, instant) {
+function drawArc(from, to, instant, where = "analyst") {
   const x1 = from.x + NOTE_W(), y1 = from.y + NOTE_H / 2;
   const x2 = to.x, y2 = to.y + NOTE_H / 2;
-  const cx = Math.max(x1, x2) + 46, cy = (y1 + y2) / 2;
-  const d = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
+  let d, len, lx, ly, label = null;
+  if (x2 - x1 > 90) {
+    // The target is a few steps away: move to its row right away and run along it,
+    // so the line clearly lands on that agent rather than skimming past others.
+    const bend = 36, run0 = x1 + bend * 2;
+    d = `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x1 + bend} ${y2}, ${run0} ${y2} L ${x2 - 2} ${y2}`;
+    len = Math.abs(y2 - y1) + (x2 - x1) + 40;
+    lx = (run0 + x2) / 2; ly = y2 - 8;
+    const full = where === "research" ? "sent back for more research" : "sent back to analyst";
+    if (x2 - run0 > (where === "research" ? 175 : 140)) label = full; else if (x2 - run0 > 70) label = "sent back";
+  } else {
+    // The very next step: a short loop from the critic back to the analyst.
+    const cx = Math.max(x1, x2) + 46, cy = (y1 + y2) / 2;
+    d = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
+    len = Math.hypot(cx - x1, 0) + Math.abs(y2 - y1) + Math.hypot(x2 - cx, 0) + 40;
+    lx = (x1 + x2) / 2; ly = cy + 4;
+    if (x2 - x1 > 74) label = "sent back";
+  }
   const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
   p.setAttribute("d", d);
-  const len = Math.hypot(cx - x1, 0) + Math.abs(y2 - y1) + Math.hypot(x2 - cx, 0) + 40;
   p.style.setProperty("--len", len);
   // A redraw (rescale) must not replay the draw-on animation, and the dashoffset must
   // be cleared too — without the animation it would stay at --len, leaving it invisible.
   if (instant || reduceMotion) { p.style.animation = "none"; p.style.strokeDashoffset = "0"; }
-  const head = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  head.setAttribute("cx", x2); head.setAttribute("cy", y2); head.setAttribute("r", 3.5); head.setAttribute("class", "cap");
+  // an arrowhead pointing into the receiving note
+  const head = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  head.setAttribute("d", `M ${x2} ${y2} l -8 -4.5 v 9 z`); head.setAttribute("class", "cap");
   arcs.appendChild(p); arcs.appendChild(head);
   // The label only earns its place if it fits in the gap between the two notes; the
   // arcs layer sits below the notes, so a label drawn into occupied space gets buried.
-  if (Math.abs(x2 - x1) > 74) {
+  if (label) {
     const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    t.setAttribute("x", (x1 + x2) / 2); t.setAttribute("y", cy + 4);
+    t.setAttribute("x", lx); t.setAttribute("y", ly);
     t.setAttribute("text-anchor", "middle");
-    t.textContent = "sent back";
+    t.textContent = label;
     arcs.appendChild(t);
   }
 }
