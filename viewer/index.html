@@ -345,6 +345,28 @@
   .kv ul { margin: 0; padding-left: 18px; } .kv li { margin: 2px 0; }
   .kv li b { font-weight: 600; color: var(--ivory); text-transform: capitalize; }
   .kv .muted { color: var(--muted); }
+  .check { display: flex !important; align-items: center; gap: 8px; font-weight: 400 !important; color: var(--text-2); cursor: pointer; }
+  .check input { width: 16px; height: 16px; accent-color: var(--brass); }
+  .pill.paused { --c: var(--amber); }
+  #resume-run { min-height: 0; padding: 6px 14px; font-size: 13px; }
+  /* plan review: the paused run's plan, editable */
+  .review { display: flex; flex-direction: column; gap: 12px; }
+  .rv-item { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; background: var(--stage); }
+  .rv-item.removed { opacity: .5; }
+  .rv-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .rv-top code { color: var(--ivory); }
+  .rv-top .rv-role { font-size: 12px; color: var(--muted); }
+  .rv-top label { margin-left: auto; font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .review textarea, .review input[type=text] { width: 100%; background: var(--stage-2); border: 1px solid var(--line); color: var(--ivory);
+    border-radius: var(--r-sm); font: inherit; font-size: 13.5px; padding: 8px 10px; resize: vertical; }
+  .review textarea:focus, .review input[type=text]:focus { outline: none; border-color: var(--brass); }
+  .review .rv-q { margin-top: 6px; font-family: var(--font-mono); font-size: 12.5px; }
+  .review .rv-fixed { font-size: 13px; color: var(--muted); }
+  .rv-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .rv-actions .primary { min-height: 40px; padding: 0 18px; }
+  .rv-note { font-size: 12.5px; color: var(--muted); }
+  .rv-error { font-size: 13px; color: var(--amber); }
+  .rv-error:empty { display: none; }
   /* A follow-up the server refused: off the thread's research. Only ever shown then. */
   .guard-note { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-top: 12px;
     padding: 10px 14px; border-left: 3px solid var(--amber); background: rgba(224,160,76,.08);
@@ -451,6 +473,11 @@
           <p class="hint">Runs in the same thread share memory, so a follow-up question builds on what earlier runs found.</p>
         </div>
         <div class="opt">
+          <span class="opt-name">Plan review</span>
+          <label class="check"><input type="checkbox" id="reviewin" /> Review the plan before research starts</label>
+          <p class="hint">The run pauses after planning so you can edit, remove or add research questions, then start research yourself.</p>
+        </div>
+        <div class="opt">
           <label for="keyin" id="key-label">Your Gemini API key (optional)</label>
           <input id="keyin" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" />
           <p class="hint">Runs on your own quota instead of the shared free tier. Sent with this run only; never stored or logged. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free key</a></p>
@@ -518,6 +545,7 @@
     <section class="panel" aria-labelledby="plan-h">
       <div class="panel-head"><h3 id="plan-h">Plan</h3><span class="sub" id="plan-sub"></span></div>
       <ol class="planlist" id="planlist"></ol>
+      <div class="review" id="review" hidden></div>
     </section>
     <section class="panel" aria-labelledby="insp-h">
       <div class="panel-head">
@@ -539,6 +567,7 @@
       <div class="copies">
         <button class="ghost copy" id="copy-brief" type="button">Copy brief</button>
         <button class="ghost copy" id="copy-thread" type="button" hidden>Copy thread</button>
+        <button class="primary" id="resume-run" type="button" hidden>Resume from where it stopped</button>
       </div>
     </div>
     <p class="meta" id="coda-meta"></p>
@@ -600,17 +629,17 @@ const ROLE = { supervisor: ["Supervisor", "Plans and delegates"], researcher: ["
 const KIND_LABEL = { run_started: "Start", plan_produced: "Plan", plan_replanned: "New plan",
   subtask_dispatched: "Dispatched", subagent_result: "Output", critic_pass: "Approved", critic_reject: "Sent back",
   recovery: "Recovery", degraded: "Skipped", memory_recall: "Memory", memory_write: "Memory",
-  halted: "Halted", completed: "Finished", error: "Error" };
+  halted: "Halted", completed: "Finished", error: "Error", plan_approved: "Your plan" };
 const OVERRIDE = { critic_pass: "--green", critic_reject: "--v-critic", recovery: "--amber",
   degraded: "--amber", halted: "--red", error: "--red", completed: "--brass",
   memory_recall: "--v-memory", memory_write: "--v-memory" };
 const STAGES = [["Plan", "--v-supervisor"], ["Research", "--v-researcher"], ["Draft", "--v-analyst"],
   ["Review", "--v-critic"], ["Write", "--v-writer"]];
 const STAGE_OF = { researcher: 1, analyst: 2, critic: 3, writer: 4 };
-const STATUS_TEXT = { running: "Running", replaying: "Replaying", completed: "Completed",
+const STATUS_TEXT = { running: "Running", replaying: "Replaying", paused: "Waiting for your approval", completed: "Completed",
   degraded: "Completed with gaps", halted: "Stopped at a limit", error: "Failed" };
 const SUB_STATUS = { pending: "Waiting", running: "Working", done: "Done", failed: "Failed",
-  retrying: "Retrying", rejected: "Sent back", degraded: "Skipped" };
+  retrying: "Retrying", rejected: "Sent back", degraded: "Skipped", skipped: "Removed" };
 
 const $ = (id) => document.getElementById(id);
 const cwrap = $("cwrap"), canvas = $("canvas"), gutter = $("gutter"), arcs = $("arcs"), playhead = $("playhead");
@@ -821,6 +850,7 @@ function humanize(ev) {
     case "memory_write": m = s.match(/stored (\d+)/); return m ? `Saved ${m[1]} findings for follow-ups` : s;
     case "memory_recall": m = s.match(/recalled (\d+)/); return m ? `Recalled ${m[1]} finding${+m[1] === 1 ? "" : "s"} from earlier in the thread` : s;
     case "completed": m = s.match(/\((\w+)\)\s*$/); return m ? (STATUS_TEXT[m[1]] || cap(m[1])) : "Run finished";
+    case "plan_approved": return ((ev.edits || (ev.data && ev.data.edits) || []).length) ? "You approved the plan with changes" : "You approved the plan";
     default: return cap(s);
   }
 }
@@ -993,6 +1023,10 @@ function renderInspector() {
       `<li>${esc(cap(a))}: ${x.calls} call${x.calls === 1 ? "" : "s"}${x.input_tokens + x.output_tokens ? `, ${fmt(x.input_tokens + x.output_tokens)} tokens` : ""}, ${Number(x.seconds).toFixed(1)}s</li>`).join("")}</ul>`]);
     if (u.estimated_cost_usd != null) rows.push(["Estimated cost", `$${u.estimated_cost_usd.toFixed(4)}`]);
   }
+  if (n.kind === "plan_approved") {
+    const edits = ev.edits || (ev.data && ev.data.edits) || [];
+    rows.push(["Your changes", edits.length ? `<ul>${edits.map((x) => `<li>${esc(cap(x))}</li>`).join("")}</ul>` : "None: approved as planned"]);
+  }
   // Memory events carry their contents (newer servers), so show what was remembered.
   for (const [key, label] of [["recalled", "Recalled"], ["stored", "Saved"]]) {
     const items = ev[key] || (ev.data && ev.data[key]);
@@ -1020,6 +1054,12 @@ function setStatus(id, status, role) {
 }
 function applyPlan(ev) {
   const k = kindOf(ev), sid = ev.subtask_id, a = ev.agent;
+  if (k === "plan_approved") {  // the plan as you approved it, statuses included (removed = skipped)
+    const items = ev.plan || (ev.data && ev.data.plan) || [];
+    setPlan(items.map(({ id, role, description, depends_on, queries, status }) =>
+      ({ id, role, description, depends_on: depends_on || [], queries: queries || [], status })));
+    return;
+  }
   if (k === "plan_produced" || k === "plan_replanned") {
     const items = ev.plan || (ev.data && ev.data.plan) || (run.rec && run.rec.subtasks) ||
       idsIn(ev.summary).map((id) => ({ id }));
@@ -1066,7 +1106,7 @@ function lastNoteFor(id) {
 function applyStage(ev) {
   const k = kindOf(ev), a = ev.agent, sid = ev.subtask_id;
   let idx = null;
-  if (a === "supervisor" && ["run_started", "subtask_dispatched", "plan_produced", "plan_replanned", "memory_recall"].includes(k)) idx = 0;
+  if (a === "supervisor" && ["run_started", "subtask_dispatched", "plan_produced", "plan_replanned", "plan_approved", "memory_recall"].includes(k)) idx = 0;
   else if (STAGE_OF[a] != null) idx = STAGE_OF[a];
   else if (k === "recovery" || k === "degraded") idx = 1;
   if (a === "researcher" && sid) {
@@ -1117,6 +1157,7 @@ function startView(opts) {
   playhead.classList.remove("on"); playhead.style.left = "0px";
   $("intro").hidden = true; $("legend").hidden = false; $("details").hidden = false;
   $("coda").hidden = true; $("fu").hidden = true; $("thread").hidden = true;
+  $("resume-run").hidden = true; hideReview();
   lastAnswer = null; threadCopy = null; resetCopy();  // a new run invalidates the previous brief
   $("runbar").hidden = false;
   setPill(opts.mode);
@@ -1125,12 +1166,15 @@ function startView(opts) {
   $("to-brief").hidden = true; $("playback").hidden = true; $("followup").hidden = true;
   clearInterval(clock);
   $("st-time").textContent = "";
-  if (opts.mode === "live") {
-    const tick = () => { $("st-time").innerHTML = `<b>${fmtDur(Date.now() - run.t0) || "0s"}</b> elapsed`; };
-    tick(); clock = setInterval(tick, 1000);
-  }
+  if (opts.mode === "live") startClock();
   renderPlan(); renderStages(); renderInspector();
   markActiveRun();
+}
+
+function startClock() {
+  clearInterval(clock);
+  const tick = () => { $("st-time").innerHTML = `<b>${fmtDur(Date.now() - run.t0) || "0s"}</b> elapsed`; };
+  tick(); clock = setInterval(tick, 1000);
 }
 
 // minimal, self-contained markdown -> html for the final brief. Escapes first, then
@@ -1335,6 +1379,9 @@ function showFinal(f) {
     }
     // if the key was rejected, surface the key field so it can be corrected
     if (/api key/i.test(f.error)) showKey("That key was rejected. Check it and try again.");
+    // the checkpoint kept what was done: continue from the last finished step
+    $("resume-run").hidden = !(f.resumable && run.mode === "live");
+    if (f.resumable) fix += " The work done so far is saved: resume to continue from where it stopped.";
     flag.textContent = f.error + fix;
   }
   if (run.mode !== "live") $("playback").hidden = false;
@@ -1342,6 +1389,31 @@ function showFinal(f) {
   $("followup").hidden = !canFollow;
   $("fu").hidden = !canFollow;
   if (canFollow) { $("fu-in").value = ""; $("fu-hint").textContent = memoryHint(null); loadThread(); }
+}
+
+// Read an SSE response frame by frame.
+async function pump(resp, onEvent) {
+  const reader = resp.body.getReader(), dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+      const line = frame.split("\n").find((l) => l.startsWith("data:"));
+      if (line) onEvent(JSON.parse(line.slice(5).trim()));
+    }
+  }
+}
+// Every frame after the first, for a fresh run and a resumed one alike.
+function handleEvent(ev) {
+  if (ev.type === "final") showFinal(ev);
+  else if (ev.type === "paused") showReview(ev);
+  else if (ev.type === "resumed") { run.threadId = ev.thread_id || run.threadId; pokeSilence(true); }
+  // A backoff event sets its own retry status; pokeSilence would overwrite it.
+  else { addNote(ev); if (ev.type !== "rate_limit_backoff") pokeSilence(true); }
 }
 
 async function conduct(opts = {}) {
@@ -1372,7 +1444,7 @@ async function conduct(opts = {}) {
   if (where === "fu") $("fu-run").textContent = "Checking…"; else $("run").textContent = thread_id ? "Checking…" : "Starting…";
   try {
     const resp = await fetch(api("/run"), { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ goal, thread_id, model: currentModel, api_key }) });
+      body: JSON.stringify({ goal, thread_id, model: currentModel, api_key, review_plan: $("reviewin").checked }) });
     if (resp.status === 429 || resp.status === 422) {
       const body = await resp.json().catch(() => ({}));
       blocked = true;
@@ -1381,29 +1453,15 @@ async function conduct(opts = {}) {
       return;
     }
     if (!resp.ok || !resp.body) throw new Error("HTTP " + resp.status);
-    const reader = resp.body.getReader(), dec = new TextDecoder();
-    let buf = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let i;
-      while ((i = buf.indexOf("\n\n")) >= 0) {
-        const frame = buf.slice(0, i); buf = buf.slice(i + 2);
-        const line = frame.split("\n").find((l) => l.startsWith("data:"));
-        if (!line) continue;
-        const ev = JSON.parse(line.slice(5).trim());
-        if (ev.type === "blocked") { blocked = true; showBlocked(ev, where); continue; }
-        begin();
-        if (ev.type === "run_started") { run.runId = ev.run_id; run.threadId = ev.thread_id; addNote(ev); pokeSilence(true); }
-        else if (ev.type === "final") showFinal(ev);
-        // A backoff event sets its own retry status; pokeSilence would overwrite it.
-        else { addNote(ev); if (ev.type !== "rate_limit_backoff") pokeSilence(true); }
-      }
-    }
+    await pump(resp, (ev) => {
+      if (ev.type === "blocked") { blocked = true; showBlocked(ev, where); return; }
+      begin();
+      if (ev.type === "run_started") { run.runId = ev.run_id; run.threadId = ev.thread_id; addNote(ev); pokeSilence(true); }
+      else handleEvent(ev);
+    });
     if (blocked) return;
     if (!started) begin();
-    if (!run.done) showFinal({ status: "error", error: "The connection closed before the run finished." });
+    if (!run.done && !run.paused) showFinal({ status: "error", error: "The connection closed before the run finished." });
   } catch (e) {
     if (!started) begin();
     if (!run.done) showFinal({ status: "error", error: `Lost the connection to the server (${e.message}). Check that it is running, then try again.` });
@@ -1517,6 +1575,93 @@ async function prepareThreadCopy(t, runs) {
   threadCopy = { text: threadAsText(records), count: records.filter((x) => x.final_output && x.final_output.content).length };
   resetCopy("copy-thread");
 }
+// --- plan review and resume ------------------------------------------------------------
+// A run paused after planning: its plan becomes a form. Only research subtasks change;
+// the analyst, critic and writer stages are fixed. "Start research" sends just the edits.
+let reviewPlan = null;
+function showReview(ev) {
+  pokeSilence(false); clearInterval(clock);
+  run.paused = true; run.pausedElapsed = Date.now() - run.t0;
+  setPill("paused");
+  $("st-time").innerHTML = "Research starts when you approve the plan";
+  reviewPlan = ev.plan || [];
+  $("planlist").hidden = true;
+  const box = $("review");
+  box.innerHTML = reviewPlan.map((p) => p.role === "researcher" ? `
+    <div class="rv-item" data-id="${escAttr(p.id)}">
+      <div class="rv-top"><code>${esc(p.id)}</code><span class="rv-role">Researcher</span>
+        <label><input type="checkbox" class="rv-remove" /> Remove</label></div>
+      <textarea class="rv-desc" rows="2" maxlength="300" aria-label="What ${escAttr(p.id)} researches">${esc(p.description)}</textarea>
+      <input type="text" class="rv-q" maxlength="300" aria-label="Searches for ${escAttr(p.id)}, comma-separated"
+        value="${escAttr((p.queries || []).join(", "))}" placeholder="Searches, comma-separated" />
+    </div>` : `
+    <div class="rv-item"><div class="rv-top"><code>${esc(p.id)}</code><span class="rv-role">${esc(cap(p.role))}</span></div>
+      <div class="rv-fixed">${esc(p.description)}</div></div>`).join("") + `
+    <div class="rv-item"><div class="rv-top"><span class="rv-role">Add a research question (optional)</span></div>
+      <textarea id="rv-add" rows="2" maxlength="300" placeholder="e.g. How much does grid battery storage cost?"></textarea></div>
+    <div class="rv-actions"><button class="primary" id="rv-start" type="button">Start research</button>
+      <span class="rv-note">Analysis, review and writing follow automatically.</span></div>
+    <p class="rv-error" id="rv-error"></p>`;
+  for (const cb of box.querySelectorAll(".rv-remove"))
+    cb.onchange = () => cb.closest(".rv-item").classList.toggle("removed", cb.checked);
+  $("rv-start").onclick = () => resumeRun(collectEdits());
+  box.hidden = false;
+  $("plan-sub").textContent = "Review it, then start research";
+  $("details").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+}
+function hideReview() { $("review").hidden = true; $("review").innerHTML = ""; $("planlist").hidden = false; reviewPlan = null; }
+function collectEdits() {
+  const edits = { subtasks: [], add: [] };
+  for (const el of $("review").querySelectorAll(".rv-item[data-id]")) {
+    const orig = reviewPlan.find((p) => p.id === el.dataset.id);
+    if (el.querySelector(".rv-remove").checked) { edits.subtasks.push({ id: orig.id, remove: true }); continue; }
+    const description = el.querySelector(".rv-desc").value.trim();
+    const queries = el.querySelector(".rv-q").value.split(",").map((q) => q.trim()).filter(Boolean).slice(0, 3);
+    const e = { id: orig.id };
+    if (description && description !== orig.description) e.description = description;
+    if (queries.join("|") !== (orig.queries || []).join("|")) e.queries = queries;
+    if (Object.keys(e).length > 1) edits.subtasks.push(e);
+  }
+  const add = $("rv-add").value.trim();
+  if (add) edits.add.push({ description: add });
+  return edits;
+}
+
+// Continue a paused or failed run from its checkpoint, on the same timeline.
+async function resumeRun(planEdits) {
+  if (!run || !run.runId) return;
+  const fromReview = !!planEdits;
+  const report = (msg) => { if (fromReview) $("rv-error").textContent = msg; else $("coda-flag").textContent = msg; };
+  const btn = fromReview ? $("rv-start") : $("resume-run");
+  btn.disabled = true; $("run").disabled = $("fu-run").disabled = true;
+  let ok = false;
+  try {
+    const resp = await fetch(api(`/runs/${run.runId}/resume`), { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: currentModel, api_key: $("keyin").value.trim() || null, plan: planEdits || null }) });
+    if (!resp.ok || !resp.body) {
+      const body = await resp.json().catch(() => ({}));
+      report(body.error || `The run couldn't resume (HTTP ${resp.status}).`);
+      return;
+    }
+    ok = true;
+    if (fromReview) hideReview();
+    $("resume-run").hidden = true; $("coda").hidden = true;
+    run.done = false; run.paused = false; follow = true;
+    run.t0 = Date.now() - (run.pausedElapsed || 0);
+    setPill("running"); startClock();
+    $("plan-sub").textContent = `${plan.size} subtasks, decided at runtime`;
+    await pump(resp, handleEvent);
+    if (!run.done && !run.paused) showFinal({ status: "error", error: "The connection closed before the run finished." });
+  } catch (e) {
+    if (ok && !run.done) showFinal({ status: "error", error: `Lost the connection to the server (${e.message}).` });
+    else report(`Couldn't reach the server (${e.message}).`);
+  } finally {
+    btn.disabled = false; pokeSilence(false); clearInterval(clock);
+    $("run").disabled = $("fu-run").disabled = false;
+    loadRuns();
+  }
+}
+
 // --- off-topic follow-ups -----------------------------------------------------------
 // The server refused a follow-up as outside its thread's research. Say why, and offer
 // to ask it as a new question, which starts a fresh thread with no memory attached.
@@ -1692,6 +1837,7 @@ $("followup").onclick = () => {
   $("fu-in").focus({ preventScroll: true });
 };
 $("fu-run").onclick = askFollowUp;
+$("resume-run").onclick = () => resumeRun(null);
 $("fu-in").addEventListener("input", () => { $("fu-block").hidden = true; });
 $("goal").addEventListener("input", () => { $("ask-block").hidden = true; });
 $("fu-in").addEventListener("keydown", (e) => { if (e.key === "Enter") askFollowUp(); });

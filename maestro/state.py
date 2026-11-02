@@ -48,6 +48,7 @@ class SubtaskStatus(str, Enum):
     done = "done"
     failed = "failed"
     degraded = "degraded"
+    skipped = "skipped"  # removed from the plan by the person reviewing it
 
 
 class CriticDecision(str, Enum):
@@ -65,6 +66,7 @@ class RunStatus(str, Enum):
 class EventType(str, Enum):
     plan_produced = "plan_produced"
     plan_replanned = "plan_replanned"
+    plan_approved = "plan_approved"  # the person reviewing the plan approved it, maybe edited
     subtask_dispatched = "subtask_dispatched"
     subagent_result = "subagent_result"
     critic_pass = "critic_pass"

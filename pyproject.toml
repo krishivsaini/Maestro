@@ -31,6 +31,8 @@ dependencies = [
     "fastapi>=0.111.0",
     "uvicorn[standard]>=0.30.0",
     "sse-starlette>=2.1.0",
+    "langgraph-checkpoint-sqlite>=2.0",
+    "langgraph-checkpoint-postgres>=2.0",
 ]
 
 [project.optional-dependencies]

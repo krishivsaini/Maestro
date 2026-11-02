@@ -28,7 +28,9 @@ def target(request, tmp_path):
     if not PG:
         pytest.skip("set MAESTRO_TEST_DATABASE_URL to test against Postgres")
     db = Database(PG)
-    db.script("DROP TABLE IF EXISTS runs; DROP TABLE IF EXISTS events; DROP TABLE IF EXISTS memory")
+    db.script("DROP TABLE IF EXISTS runs; DROP TABLE IF EXISTS events; DROP TABLE IF EXISTS memory; "
+              "DROP TABLE IF EXISTS checkpoints; DROP TABLE IF EXISTS checkpoint_blobs; "
+              "DROP TABLE IF EXISTS checkpoint_writes; DROP TABLE IF EXISTS checkpoint_migrations")
     db.close()
     return PG
 
@@ -133,3 +135,15 @@ def test_an_unreachable_database_falls_back_instead_of_taking_the_demo_down(make
     app = app_over("postgresql://nobody:x@127.0.0.1:1/nothing", make_stub)  # nothing listens on port 1
     assert app.get("/healthz").json() == {"status": "ok", "storage": "sqlite (database unreachable)"}
     assert app.post("/run", json={"goal": "Compare solar and wind"}).status_code == 200
+
+
+def test_a_run_paused_for_review_survives_a_restart(target, make_stub):
+    # pause after planning on one app; approve on a fresh one over the same database
+    first = app_over(target, make_stub)
+    paused = _parse_sse(first.post("/run", json={"goal": "Compare solar and wind", "review_plan": True}).text)[-1]
+    assert paused["type"] == "paused"
+
+    restarted = app_over(target, make_stub)
+    frames = _parse_sse(restarted.post(f"/runs/{paused['run_id']}/resume", json={}).text)
+    assert frames[0]["type"] == "resumed" and frames[-1]["status"] == "completed"
+    assert [r["run_id"] for r in restarted.get("/runs").json()["runs"]] == [paused["run_id"]]

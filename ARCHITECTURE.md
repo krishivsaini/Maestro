@@ -191,6 +191,25 @@ remains for in-process use (`run_goal`), with a swappable embedder.
 
 ---
 
+## Checkpoints: plan review and resume
+
+In the service, the graph is compiled with a checkpointer (LangGraph's `PostgresSaver` when
+`DATABASE_URL` is set, `SqliteSaver` otherwise), keyed by run id, so the run's state is saved after
+every node. Two things follow:
+
+- **Plan review.** With `review_plan`, the graph is compiled with `interrupt_before=["research"]`:
+  the run stops after planning and streams a `paused` frame with the plan. `POST /runs/{id}/resume`
+  applies the visitor's edits through `apply_plan_edits` (only research subtasks change: edit,
+  remove as `skipped`, or add; at least one researcher stays), records a `plan_approved` event, and
+  continues.
+- **Resume after failure.** A run that fails partway keeps its last checkpoint; its final frame says
+  `resumable`, and the same endpoint continues from the node that failed, without re-running the
+  planner or the researchers. Events already streamed are never sent again.
+
+A finished run's checkpoints are deleted: it is replayed from the trace store instead.
+
+---
+
 ## Observability (`maestro/trace.py`)
 
 Every meaningful transition appends a `TraceEvent` (plan_produced, subtask_dispatched,

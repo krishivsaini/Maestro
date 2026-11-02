@@ -114,7 +114,62 @@ def _first_by_role(subtasks: list[Subtask], role: Role) -> Subtask:
 
 
 def _researchers(subtasks: list[Subtask]) -> list[Subtask]:
-    return [s for s in subtasks if s.role == Role.researcher]
+    """Researcher subtasks still in the plan (not removed by the person reviewing it)."""
+    return [s for s in subtasks if s.role == Role.researcher and s.status != SubtaskStatus.skipped]
+
+
+def apply_plan_edits(subtasks: list[Subtask], edits: dict, max_subtasks: int) -> tuple[list[Subtask], TraceEvent]:
+    """Apply a reviewer's edits to a paused run's plan.
+
+    ``edits``: ``{"subtasks": [{"id", "description"?, "queries"?, "remove"?}], "add": [{"description",
+    "queries"?}]}``. Only researcher subtasks can be edited or removed (the analyst, critic
+    and writer stages are fixed), at least one researcher must remain, and additions are
+    capped by ``max_subtasks``. Returns the subtasks to merge into the state and a
+    ``plan_approved`` event carrying the plan as approved. Raises ``ValueError`` on an
+    edit that can't apply.
+    """
+    by_id = {s.id: s for s in subtasks}
+    changed: dict[str, Subtask] = {}
+    notes: list[str] = []
+    for e in edits.get("subtasks") or []:
+        st = by_id.get(e.get("id"))
+        if st is None:
+            raise ValueError(f"no subtask {e.get('id')!r} in this plan")
+        if st.role != Role.researcher:
+            raise ValueError(f"only research subtasks can be changed; {st.id} is the {st.role.value}")
+        if e.get("remove"):
+            changed[st.id] = st.model_copy(update={"status": SubtaskStatus.skipped})
+            notes.append(f"removed {st.id}")
+            continue
+        update = {}
+        if e.get("description") and e["description"].strip() != st.description:
+            update["description"] = e["description"].strip()
+        if e.get("queries") is not None and list(e["queries"]) != st.queries:
+            update["queries"] = [q.strip() for q in e["queries"] if q.strip()][:3]
+        if update:
+            changed[st.id] = st.model_copy(update=update)
+            notes.append(f"edited {st.id}")
+    existing = set(by_id)
+    added = []
+    for k, a in enumerate(edits.get("add") or [], start=1):
+        sid = f"research_added_{k}"
+        while sid in existing:
+            sid += "_"
+        existing.add(sid)
+        added.append(Subtask(id=sid, description=a["description"].strip(), role=Role.researcher,
+                             queries=[q.strip() for q in (a.get("queries") or []) if q.strip()][:3]))
+        notes.append(f"added {sid}")
+    final = [changed.get(s.id, s) for s in subtasks] + added
+    if not _researchers(final):
+        raise ValueError("keep at least one research subtask")
+    if len([s for s in final if s.status != SubtaskStatus.skipped]) > max_subtasks:
+        raise ValueError(f"a plan can have at most {max_subtasks} subtasks")
+    summary = "plan approved" + (f": {', '.join(notes)}" if notes else " as planned")
+    event = TraceEvent(event_type=EventType.plan_approved, agent="supervisor", summary=summary, data={
+        "uid": uuid.uuid4().hex, "edits": notes,
+        "plan": [{"id": s.id, "role": s.role.value, "description": s.description, "depends_on": list(s.depends_on),
+                  "queries": list(s.queries), "status": s.status.value} for s in final]})
+    return list(changed.values()) + added, event
 
 
 def build_graph(
@@ -123,11 +178,17 @@ def build_graph(
     settings: Optional[Settings] = None,
     event_sink: Optional[Callable[[TraceEvent], None]] = None,
     meter=None,
+    checkpointer=None,
+    review_plan: bool = False,
 ):
     """Compile and return the Maestro StateGraph.
 
     ``meter`` (a ``UsageMeter``, maestro/usage.py) records every model and embedding
     call the run makes, per agent.
+
+    ``checkpointer`` saves the run's state after every node, so a run that fails partway
+    can resume from its last finished node; ``review_plan`` (which needs one) pauses the
+    run after planning, before research, for a person to approve or edit the plan.
 
     ``event_sink`` receives events *as they happen*, before the node producing them
     returns. The graph stream only yields between nodes, so without it a node that
@@ -514,7 +575,8 @@ def build_graph(
                              {"revise": "analyze", "replan": "replan", "write": "write"})
     sg.add_edge("replan", "analyze")
     sg.add_edge("write", END)
-    return sg.compile()
+    return sg.compile(checkpointer=checkpointer,
+                      interrupt_before=["research"] if review_plan and checkpointer is not None else None)
 
 
 def run_goal(
