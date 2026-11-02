@@ -5,13 +5,25 @@
 ![langgraph](https://img.shields.io/badge/orchestration-LangGraph-1C3C3C)
 [![live demo](https://img.shields.io/badge/live%20demo-online-2ea44f)](https://maestro-bb8l.onrender.com)
 
-**A multi-agent research system where the agents check each other's work, and every decision is visible.**
+**A supervisor-orchestrated multi-agent system for evidence-grounded research: stateful graph
+orchestration, adversarial self-correction, fault-tolerant execution and human-in-the-loop control,
+with every decision observable and replayable.**
 
 Give Maestro a hard question (*"Compare PostgreSQL and MongoDB for a startup's first product, and
-recommend one"*). A supervisor plans the research at runtime, researchers read real web pages in
-parallel, an analyst drafts a cited argument, a critic verifies every claim against its evidence and
-sends the work back when it falls short, and a writer produces the final brief. You watch all of it
-stream live.
+recommend one"*). A supervisor agent decomposes it at runtime and delegates to role-specialized
+subagents: researchers read real web pages concurrently, an analyst drafts a cited argument, a critic
+verifies every claim against its evidence and routes the work back for revision or further research,
+and a writer synthesizes the final brief. The whole orchestration streams live over SSE.
+
+- **Dynamic task decomposition and delegation** across five agents with isolated contexts, coordinated
+  through typed shared state on a LangGraph `StateGraph`
+- **Self-correcting critic loop** with a verdict computed in code, plus **adaptive replanning** when
+  evidence is missing
+- **Fault tolerance:** a retry → re-delegate → degrade recovery ladder, exponential backoff, and
+  **checkpointed, resumable execution**
+- **Human-in-the-loop** plan approval through graph interrupts
+- **Production concerns built in:** per-agent token and cost telemetry, semantic memory, prompt-injection
+  defence, rate limiting, durable Postgres storage, and replay-based regression tests in CI
 
 https://github.com/user-attachments/assets/4956f815-f2f3-4dc4-a0ac-8a024fb712ee
 
